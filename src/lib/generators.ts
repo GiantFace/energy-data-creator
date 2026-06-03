@@ -66,6 +66,18 @@ const hms = (d: Date) => `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getS
 const isoLocal = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
+// Egyedi fájlnév-bélyeg: yyyyMMdd_HHmmss; ha ugyanabba a másodpercbe esne két generálás,
+// sorszámmal egészül ki, így MINDIG egyedi nevet kapunk.
+let _lastTs = '';
+let _seq = 0;
+function uniqueSuffix(d: Date): string {
+  const base = `${ymd(d)}_${hms(d)}`;
+  if (base === _lastTs) { _seq += 1; return `${base}_${_seq}`; }
+  _lastTs = base;
+  _seq = 0;
+  return base;
+}
+
 // 33 karakteres szintetikus POD; az előtag a DSO-ból jön (EHE000120 -> HU000120…).
 function pod(i: number, dso: string): string {
   const num = dso.toUpperCase().startsWith('EHE') ? dso.slice(3) : dso;
@@ -148,11 +160,13 @@ export function generateBundle(
   let points = 0;
   let invDevices = 0;
 
+  // Közös, egyedi időbélyeg az egész generáláshoz (minden fájl neve ezzel egyedi).
+  const suffix = uniqueSuffix(now);
+
   if (szinkron) {
     const lines = [HEADER, ...Array.from({ length: count }, (_, k) => szinkronRow(k + 1, dso))];
-    const nextYear = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
     files.push({
-      name: `Szinkron_${dso}_${TRADER}_${ymd(now)}_${ymd(nextYear)}.csv`,
+      name: `Szinkron_${dso}_${TRADER}_${suffix}.csv`,
       content: lines.join('\r\n') + '\r\n',
       mime: 'text/csv',
       target: 'sftp',
@@ -165,7 +179,7 @@ export function generateBundle(
     const { xml, points: pts } = buildMavirXml(pods, from, now, now);
     points = pts;
     files.push({
-      name: `${dso}_${TRADER}_Eseti_FF_EGYEDI1_${ymd(now)}_${hms(now)}.xml`,
+      name: `${dso}_${TRADER}_Eseti_FF_EGYEDI1_${suffix}.xml`,
       content: xml,
       mime: 'application/xml',
       target: 'sftp',
@@ -177,7 +191,7 @@ export function generateBundle(
   if (inverter) {
     invDevices = count;
     files.push({
-      name: 'inverter-brand_master-data.json',
+      name: `inverter-brand_master-data_${suffix}.json`,
       content: buildInverterJson(pods, invSpec),
       mime: 'application/json',
       target: 'swagger',
