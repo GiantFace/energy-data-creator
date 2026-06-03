@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import logo from './assets/logo.webp';
+import DotField from './DotField';
 import {
   BRANDS,
   DSOS,
@@ -90,8 +91,20 @@ export default function App() {
   const targetUrl = (t: string) => (t === 'swagger' ? swaggerUrl : sftpUrl);
 
   return (
-    <div className="app">
-      <header className="topbar">
+    <>
+      <div className="bg-dots" aria-hidden="true">
+        <DotField
+          dotRadius={1.5}
+          dotSpacing={14}
+          bulgeStrength={67}
+          glowRadius={160}
+          sparkle={false}
+          waveAmplitude={0}
+          glowColor={theme === 'dark' ? 'rgba(99, 102, 241, 0.20)' : 'rgba(99, 102, 241, 0.12)'}
+        />
+      </div>
+      <div className="app">
+        <header className="topbar">
         <img className="logo" src={logo} alt="FEAK" />
         <div className="titles">
           <h1>ENAP - KEP adatgenerátor</h1>
@@ -197,6 +210,7 @@ export default function App() {
           illetve illeszted a Swagger UI-ba.
         </footer>
       </main>
-    </div>
+      </div>
+    </>
   );
 }

@@ -35,7 +35,14 @@ body {
   transition: background 0.2s ease, color 0.2s ease;
 }
 
-.app { max-width: 960px; margin: 0 auto; padding: 28px 20px 60px; }
+.bg-dots {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.app { max-width: 960px; margin: 0 auto; padding: 28px 20px 60px; position: relative; z-index: 1; }
 
 .topbar {
   display: flex;
