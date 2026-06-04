@@ -34,3 +34,8 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Helyi referencia- és teszt-anyagok (BELSŐ – ne kerüljenek a publikus deployba)
+*.docx
+api_schema.txt
+tesztbetoltes/
