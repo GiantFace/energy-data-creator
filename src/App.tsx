@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import logo from './assets/logo.webp';
 import DotField from './DotField';
 import {
-  BRANDS,
   DSOS,
   generateBundle,
   type GeneratedFile,
   type InverterSpec,
 } from './lib/generators';
+import { DEVICE_BRANDS, DEVICE_TYPES, type DeviceModel } from './lib/deviceTypes';
 import { getCookie, setCookie } from './lib/cookies';
 import { Icon, type IconName } from './Icons';
 import './App.css';
@@ -22,6 +22,10 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const toInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const yesterday = () => { const d = new Date(); d.setDate(d.getDate() - 1); return toInput(d); };
 const today = () => toInput(new Date());
+
+// Inverter gyártó/modell – a pod-registry-db DeviceTypes adataiból
+const FIRST_BRAND = DEVICE_TYPES['BYD'] ? 'BYD' : DEVICE_BRANDS[0];
+const str = (n: number | null | undefined) => (n == null ? '' : String(n));
 
 function download(file: GeneratedFile) {
   const blob = new Blob([file.content], { type: file.mime + ';charset=utf-8' });
@@ -60,12 +64,29 @@ export default function App() {
   const [meres, setMeres] = useState(true);
   const [inverter, setInverter] = useState(false);
 
-  const [brand, setBrand] = useState('BYD');
-  const [model, setModel] = useState('Power-Box SH3K');
-  const [power, setPower] = useState('3000');
-  const [vmin, setVmin] = useState('100');
-  const [vmax, setVmax] = useState('380');
+  const [brand, setBrand] = useState(FIRST_BRAND);
+  const initModel = DEVICE_TYPES[FIRST_BRAND]?.[0];
+  const [model, setModel] = useState(initModel?.model ?? '');
+  const [power, setPower] = useState(str(initModel?.nominalPower));
+  const [vmin, setVmin] = useState(str(initModel?.acVoltageMin));
+  const [vmax, setVmax] = useState(str(initModel?.acVoltageMax));
   const [invDate, setInvDate] = useState(today());
+
+  // A modell értékeit (nominal/min/max) automatikusan kitölti; a gyártóváltás az első modellt veszi.
+  function applyModel(rec: DeviceModel | undefined) {
+    if (!rec) return;
+    setModel(rec.model);
+    setPower(str(rec.nominalPower));
+    setVmin(str(rec.acVoltageMin));
+    setVmax(str(rec.acVoltageMax));
+  }
+  function onBrandChange(b: string) {
+    setBrand(b);
+    applyModel(DEVICE_TYPES[b]?.[0]);
+  }
+  function onModelChange(m: string) {
+    applyModel(DEVICE_TYPES[brand]?.find((x) => x.model === m));
+  }
 
   const [files, setFiles] = useState<GeneratedFile[] | null>(null);
   const [error, setError] = useState('');
@@ -199,15 +220,24 @@ export default function App() {
               {inverter && (
                 <section className="card">
                   <h2>Inverter gyártói adatok</h2>
-                  <p className="desc">A pod-registry-db DeviceTypes táblából. A serialNumber = POD + _INV.</p>
+                  <p className="desc">
+                    A pod-registry-db DeviceTypes táblából. Válassz gyártót, majd a hozzá tartozó modellek közül – a
+                    nominalPower / acVoltageMin / acVoltageMax a modell alapján automatikusan kitöltődik (felülírható).
+                    A serialNumber = POD + _INV.
+                  </p>
                   <div className="grid3">
                     <label>
                       <span>Gyártó (brand)</span>
-                      <select value={brand} onChange={(e) => setBrand(e.target.value)}>
-                        {BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
+                      <select value={brand} onChange={(e) => onBrandChange(e.target.value)}>
+                        {DEVICE_BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
                       </select>
                     </label>
-                    <label><span>Modell</span><input value={model} onChange={(e) => setModel(e.target.value)} /></label>
+                    <label>
+                      <span>Modell</span>
+                      <select value={model} onChange={(e) => onModelChange(e.target.value)}>
+                        {(DEVICE_TYPES[brand] ?? []).map((m) => <option key={m.model} value={m.model}>{m.model}</option>)}
+                      </select>
+                    </label>
                     <label><span>Telepítés dátuma</span><input type="date" value={invDate} onChange={(e) => setInvDate(e.target.value)} /></label>
                     <label><span>nominalPower</span><input type="number" value={power} onChange={(e) => setPower(e.target.value)} /></label>
                     <label><span>acVoltageMin</span><input type="number" value={vmin} onChange={(e) => setVmin(e.target.value)} /></label>

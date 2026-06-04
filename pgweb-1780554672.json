@@ -1,0 +1,2866 @@
+[
+ {
+  "acVoltageMax": 30,
+  "acVoltageMin": 20,
+  "brand": "ABB",
+  "function": 2,
+  "model": "PVS-50-TL",
+  "nominalPower": 10
+ },
+ {
+  "acVoltageMax": 20,
+  "acVoltageMin": 10,
+  "brand": "AEG",
+  "function": 2,
+  "model": "AS-IC01-10000-2",
+  "nominalPower": 15
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 200,
+  "brand": "AEG",
+  "function": 2,
+  "model": "AS-IC01-17000-2",
+  "nominalPower": 17000
+ },
+ {
+  "acVoltageMax": 30,
+  "acVoltageMin": 20,
+  "brand": "AEG",
+  "function": 2,
+  "model": "AS-IR01-1000",
+  "nominalPower": 10
+ },
+ {
+  "acVoltageMax": 300,
+  "acVoltageMin": 120,
+  "brand": "AEG",
+  "function": 2,
+  "model": "AS-IR01-750",
+  "nominalPower": 300
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "AFORE",
+  "function": 2,
+  "model": "AF3.6K-SL",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "AFORE",
+  "function": 2,
+  "model": "AF3K-SL",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "AFORE",
+  "function": 2,
+  "model": "AF4.6K-SL",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "AFORE",
+  "function": 2,
+  "model": "AF4K-SL",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "AFORE",
+  "function": 2,
+  "model": "AF5.5K-SL",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "AFORE",
+  "function": 2,
+  "model": "AF5K-SL",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "AFORE",
+  "function": 2,
+  "model": "AF6K-SL",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 120,
+  "acVoltageMin": 100,
+  "brand": "ASD",
+  "function": 2,
+  "model": "ASD",
+  "nominalPower": 1000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "ASTRASUN",
+  "function": 2,
+  "model": "Rocky Mikroinverter 250",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 250,
+  "acVoltageMin": 220,
+  "brand": "BENNING",
+  "function": 2,
+  "model": "TLS 15.3",
+  "nominalPower": 110
+ },
+ {
+  "acVoltageMax": 380,
+  "acVoltageMin": 100,
+  "brand": "BYD",
+  "function": 2,
+  "model": "Power-Box SH3K",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": 30,
+  "acVoltageMin": 20,
+  "brand": "BYD",
+  "function": 2,
+  "model": "Power-Box SH3K",
+  "nominalPower": 10
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-10K-SG01HP3-EU-AM2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-10K-SG04LP3-EU",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 380,
+  "acVoltageMin": 100,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-10K-SG04LP3-EU",
+  "nominalPower": 4500
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-12K-SG01HP3-EU-AM2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-12K-SG04LP3-EU",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-15K-SG01HP3-EU-AM2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-20K-SG01HP3-EU-AM2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-25K-SG01HP3-EU-AM2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-29.9K-SG01HP3-EU-BM3",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 260,
+  "acVoltageMin": 230,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-30K-SG01HP3-EU-BM3",
+  "nominalPower": 120
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-30K-SG01HP3-EU-BM3",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-35K-SG01HP3-EU-BM3",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-40K-SG01HP3-EU-BM4",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-50K-SG01HP3-EU-BM4",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-5K-SG01HP3-EU-AM2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-5K-SG04LP3-EU",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-6K-SG01HP3-EU-AM2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-6K-SG04LP3-EU",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-8K-SG01HP3-EU-AM2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Deye",
+  "function": 2,
+  "model": "SUN-8K-SG04LP3-EU",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 120,
+  "brand": "DeYe",
+  "function": 2,
+  "model": "SUN-10K-SG04LP3-EU",
+  "nominalPower": 1000
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 100,
+  "brand": "DEYE",
+  "function": 2,
+  "model": "SUN-10K-SG04LP3-EU",
+  "nominalPower": 10000
+ },
+ {
+  "acVoltageMax": 30,
+  "acVoltageMin": 20,
+  "brand": "EHE",
+  "function": 2,
+  "model": "EHE-N50K",
+  "nominalPower": 10
+ },
+ {
+  "acVoltageMax": 30,
+  "acVoltageMin": 20,
+  "brand": "Fiktív Harveys",
+  "function": 2,
+  "model": "SZG-03-20",
+  "nominalPower": 10
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 110,
+  "brand": "FIMER",
+  "function": 2,
+  "model": "PVS-10-TL-SX",
+  "nominalPower": 900
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 110,
+  "brand": "FIMER",
+  "function": 2,
+  "model": "PVS-20TL-SX",
+  "nominalPower": 20000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "FIMER",
+  "function": 2,
+  "model": "React2-UNO-3.6-TL",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "FIMER",
+  "function": 2,
+  "model": "React2-UNO-5.0-TL",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 110,
+  "brand": "FIMER",
+  "function": 2,
+  "model": "UNO-DM-1.2TL-PLUS-B",
+  "nominalPower": 1200
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 110,
+  "brand": "FIMER",
+  "function": 2,
+  "model": "UNO-DM-4.0-TL-PLUS-SB",
+  "nominalPower": 4100
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 110,
+  "brand": "FIMER",
+  "function": 2,
+  "model": "UNO-DM-5.0TL-PLUS-B",
+  "nominalPower": 5100
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "FoxESS",
+  "function": 2,
+  "model": "H3-10.0-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "FoxESS",
+  "function": 2,
+  "model": "H3-12.0-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "FoxESS",
+  "function": 2,
+  "model": "H3-5.0-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "FoxESS",
+  "function": 2,
+  "model": "H3-6.0-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "FoxESS",
+  "function": 2,
+  "model": "H3-8.0-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 380,
+  "acVoltageMin": 100,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "ECO 25.0-3-S",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": 900,
+  "acVoltageMin": 800,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Eco 27.0-3-S",
+  "nominalPower": 700
+ },
+ {
+  "acVoltageMax": 30,
+  "acVoltageMin": 20,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Fronius CL 36.0",
+  "nominalPower": 10
+ },
+ {
+  "acVoltageMax": 280,
+  "acVoltageMin": 100,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Galvo 1.5-1",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 3.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 3.0 Lite",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 3.0 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 3.6",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 3.6 Lite",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 3.6 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 4.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 4.0 Lite",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 4.0 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 4.6",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 4.6 Lite",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 4.6 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 5.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 5.0 Lite",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 5.0 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 6.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 6.0 Lite",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Primo GEN24 6.0 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 380,
+  "acVoltageMin": 100,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo 7.0-3-M",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": 380,
+  "acVoltageMin": 100,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo 7.0-3-M Light",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 10.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 10.0 LITE",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 10.0 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 3.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 3.0 LITE",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 3.0 PLUS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 4.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 4.0 LITE",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 4.0 PLUS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 5.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 5.0 LITE",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 5.0 PLUS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 6.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 6.0 LITE",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 6.0 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 7.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 7.0 LITE",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 7.0 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 8.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 8.0 LITE",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 8.0 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 9.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 9.0 LITE",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo GEN24 9.0 Plus",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo Hybrid 3.0-3-S",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo Hybrid 4.0-3-S",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Symo Hybrid 5.0-3-S",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 300,
+  "acVoltageMin": 180,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Verto 25.0",
+  "nominalPower": 250
+ },
+ {
+  "acVoltageMax": 280,
+  "acVoltageMin": 100,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Verto 25.0",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": 250,
+  "acVoltageMin": 180,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Verto 25.0",
+  "nominalPower": 30
+ },
+ {
+  "acVoltageMax": 280,
+  "acVoltageMin": 100,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Verto 27.0",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": 870,
+  "acVoltageMin": 150,
+  "brand": "Fronius",
+  "function": 2,
+  "model": "Verto 33.3",
+  "nominalPower": 600
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Generic",
+  "function": 1,
+  "model": "Meter",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 380,
+  "acVoltageMin": 100,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW1000-XS",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW10K-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW10K-ET-20",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW10KN-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW12K-ET-20",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW15K-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW15K-ET-20",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW20K-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW25K-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW29.9K-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW5K-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW5KN-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW6000-ET-20",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW6.5K-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW6.5KN-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW8000-ET-20",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW8K-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GOODWE",
+  "function": 2,
+  "model": "GW8KN-ET",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MID 11KTL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MID 12KTL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MID 13KTL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MID 15KTL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MID 17KTL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MID 20KTL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MID 25KTL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MID 30KTL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MOD 10KTL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MOD 3000TL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MOD 4000TL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MOD 5000TL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MOD 6000TL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MOD 7000TL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MOD 8000TL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "MOD 9000TL3-XH",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "SPH3000",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "SPH3600",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "SPH4000",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "SPH4600",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "SPH5000",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "GROWATT",
+  "function": 2,
+  "model": "SPH6000",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Hoymiles",
+  "function": 2,
+  "model": "HYT-10.0HV-EUG1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Hoymiles",
+  "function": 2,
+  "model": "HYT-12.0HV-EUG1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Hoymiles",
+  "function": 2,
+  "model": "HYT-5.0HV-EUG1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Hoymiles",
+  "function": 2,
+  "model": "HYT-6.0HV-EUG1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Hoymiles",
+  "function": 2,
+  "model": "HYT-8.0HV-EUG1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 990,
+  "acVoltageMin": 300,
+  "brand": "Huawei",
+  "function": 1,
+  "model": "SUN2000-12K-MAP0",
+  "nominalPower": 1500
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-10K-MAP0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 380,
+  "acVoltageMin": 100,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-10KTL",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": 380,
+  "acVoltageMin": 100,
+  "brand": "HUAWEI",
+  "function": 1,
+  "model": "SUN2000-10KTL",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-10KTL-M0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-10KTL-M1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-12K-MAP0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-12K-MB0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-15K-MB0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 380,
+  "acVoltageMin": 100,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-15KTL-M3",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-17K-MB0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-20K-MB0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-25K-MB0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-2KTL-L1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-3.68KTL-L1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-3KTL-L1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-3KTL-M0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-3KTL-M1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-4.6KTL-L1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-4KTL-L1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-4KTL-M0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-4KTL-M1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-5K-MAP0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-5KTL-L1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-5KTL-M0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-5KTL-M1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-6K-MAP0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-6KTL-M0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-6KTL-M1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-8K-MAP0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-8KTL-M0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN2000-8KTL-M1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN5000-12K-MAP0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "HUAWEI",
+  "function": 2,
+  "model": "SUN5000-8K-MAP0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "10000T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "12000T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "15000T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "18000T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "20000T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "3000T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "5000T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "6000T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "8000T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 380,
+  "acVoltageMin": 100,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "Isuna 5000T",
+  "nominalPower": 4500
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 200,
+  "brand": "ISUNA",
+  "function": 2,
+  "model": "Isuna 5000T",
+  "nominalPower": 4500
+ },
+ {
+  "acVoltageMax": 500,
+  "acVoltageMin": 0,
+  "brand": "Kamugyártó01",
+  "function": 2,
+  "model": "Kamutípus01",
+  "nominalPower": 1000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-1020T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-1025T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-1030T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-1035T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-1225T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-1230T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-1235T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-1535T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-1540T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-1545T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-615T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-620T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-625T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-630T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-815T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-820T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-825T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-830T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "LENERCOM",
+  "function": 2,
+  "model": "LC-E2-835T",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Midea",
+  "function": 2,
+  "model": "M1-T10K",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Midea",
+  "function": 2,
+  "model": "ME-HT10H",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Midea",
+  "function": 2,
+  "model": "ME-HT12H",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Midea",
+  "function": 2,
+  "model": "ME-HT15H",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Midea",
+  "function": 2,
+  "model": "ME-HT6H",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Midea",
+  "function": 2,
+  "model": "ME-HT8H",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 30,
+  "acVoltageMin": 20,
+  "brand": "NewBrand0320",
+  "function": 2,
+  "model": "Model-001",
+  "nominalPower": 10
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Nord",
+  "function": 2,
+  "model": "EcoMaster 3P 10.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Nord",
+  "function": 2,
+  "model": "EcoMaster 3P 12.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Nord",
+  "function": 2,
+  "model": "EcoMaster 3P 15.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Nord",
+  "function": 2,
+  "model": "EcoMaster 3P 5.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Nord",
+  "function": 2,
+  "model": "EcoMaster 3P 6.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 200,
+  "brand": "Nord",
+  "function": 2,
+  "model": "EcoMaster 3P 6.0",
+  "nominalPower": 6000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Nord",
+  "function": 2,
+  "model": "EcoMaster 3P 8.0",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SAJ",
+  "function": 2,
+  "model": "H2-10K-T2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SAJ",
+  "function": 2,
+  "model": "H2-5K-T2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SAJ",
+  "function": 2,
+  "model": "H2-6K-T2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SAJ",
+  "function": 2,
+  "model": "H2-8K-T2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 30,
+  "acVoltageMin": 20,
+  "brand": "SAJ",
+  "function": 2,
+  "model": "R5-2K-S1",
+  "nominalPower": 10
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SMA",
+  "function": 2,
+  "model": "STP10.0-3SE-40",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SMA",
+  "function": 2,
+  "model": "STP5.0-3SE-40",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SMA",
+  "function": 2,
+  "model": "STP6.0-3SE-40",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SMA",
+  "function": 2,
+  "model": "STP8.0-3SE-40",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolarEdge",
+  "function": 2,
+  "model": "SE10K-RWB48",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolarEdge",
+  "function": 2,
+  "model": "SE10K-RWS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolarEdge",
+  "function": 2,
+  "model": "SE5K-RWB48",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolarEdge",
+  "function": 2,
+  "model": "SE5K-RWS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolarEdge",
+  "function": 2,
+  "model": "SE7K-RWS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolarEdge",
+  "function": 2,
+  "model": "SE8K-RWB48",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolarEdge",
+  "function": 2,
+  "model": "SE8K-RWS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X1-Hybrid-3.0-D-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X1-Hybrid-3.7-D-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X1-Hybrid-5.0-D-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-10.0-D",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-10.0-D-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-10.0-M",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-12.0-D",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-12.0-M",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-15.0-D",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-15.0-M",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-5.0-D",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-5.0-D-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-5.0-M",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-6.0-D",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-6.0-D-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-6.0-M",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-8.0-D",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-8.0-D-E",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-Hybrid-8.0-M",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-ULT-15K",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-ULT-19.9K",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-ULT-20K",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-ULT-25K",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SolaX",
+  "function": 2,
+  "model": "X3-ULT-30K",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-10K-25",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-10K-40",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-12K-25",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-12K-40",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-15K-40",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-20K-40",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-25K-100",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-30K-100",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-36K-100",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-40K-100",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-40K-100-P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-4K-25",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-50K-100",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-50K-100-P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-5K-25",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-6K-25",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solinteg",
+  "function": 2,
+  "model": "MHT-8K-25",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 240,
+  "acVoltageMin": 200,
+  "brand": "Solis",
+  "function": 2,
+  "model": "S5-GR3P3K",
+  "nominalPower": 3000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solis",
+  "function": 2,
+  "model": "S6-EH3P10K02-NV-YD-L",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solis",
+  "function": 2,
+  "model": "S6-EH3P12K02-NV-YD-L",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solis",
+  "function": 2,
+  "model": "S6-EH3P15K02-NV-YD-L",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solis",
+  "function": 2,
+  "model": "S6-EH3P30K-H",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solis",
+  "function": 2,
+  "model": "S6-EH3P40K-H",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solis",
+  "function": 2,
+  "model": "S6-EH3P50K-H",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solis",
+  "function": 2,
+  "model": "S6-EH3P8K02-NV-YD-L",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW05kH-T2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW05kH-T2-O",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW06kH-T2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW06kH-T2-O",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW08kH-T1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW08kH-T2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW08kH-T2-O",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW08kH-T3",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW08kH-T3-O",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW10kH-T1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW10kH-T2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW10kH-T2-O",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW10kH-T3",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW10kH-T3-O",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW12kH-T1",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW12kH-T2",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW12kH-T2-O",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW12kH-T3",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW12kH-T3-O",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 230,
+  "acVoltageMin": 0,
+  "brand": "Solplanet",
+  "function": 1,
+  "model": "ASW5-T",
+  "nominalPower": 5000
+ },
+ {
+  "acVoltageMax": 230,
+  "acVoltageMin": 0,
+  "brand": "Solplanet",
+  "function": 2,
+  "model": "ASW5-T",
+  "nominalPower": 5000
+ },
+ {
+  "acVoltageMax": 0,
+  "acVoltageMin": 0,
+  "brand": "string",
+  "function": 2,
+  "model": "string",
+  "nominalPower": 0
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNGROW",
+  "function": 2,
+  "model": "SH10RT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNGROW",
+  "function": 2,
+  "model": "SH5.0RT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNGROW",
+  "function": 2,
+  "model": "SH6.0RT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNGROW",
+  "function": 2,
+  "model": "SH8.0RT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-10KTL-HT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-12KTL-HT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-3.6KTL-HSS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-3KTL-HSS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": 250,
+  "acVoltageMin": 0,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-3KTL-HSS",
+  "nominalPower": 1000
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-4.2KTL-HS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-4.6KTL-HS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-4KTL-HT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-5KTL-HS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-5KTL-HT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-6KTL-HS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-6KTL-HT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-7KTL-HS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-8KTL-HS",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "SUNWAYS",
+  "function": 2,
+  "model": "STH-8KTL-HT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Ucanpower",
+  "function": 2,
+  "model": "UHC-10KT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Ucanpower",
+  "function": 2,
+  "model": "UHC-12KT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Ucanpower",
+  "function": 2,
+  "model": "UHC-15KT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Ucanpower",
+  "function": 2,
+  "model": "UHC-20KT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Ucanpower",
+  "function": 2,
+  "model": "UHC-4KT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Ucanpower",
+  "function": 2,
+  "model": "UHC-5KT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Ucanpower",
+  "function": 2,
+  "model": "UHC-6KT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Ucanpower",
+  "function": 2,
+  "model": "UHC-8KT",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Wattsonic",
+  "function": 2,
+  "model": "10K-25A-3P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Wattsonic",
+  "function": 2,
+  "model": "10K-40A-3P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Wattsonic",
+  "function": 2,
+  "model": "12K-25A-3P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Wattsonic",
+  "function": 2,
+  "model": "12K-40A-3P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Wattsonic",
+  "function": 2,
+  "model": "15K-40A-3P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Wattsonic",
+  "function": 2,
+  "model": "20K-40A-3P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Wattsonic",
+  "function": 2,
+  "model": "4.0K-25A-3P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Wattsonic",
+  "function": 2,
+  "model": "5.0K-25A-3P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Wattsonic",
+  "function": 2,
+  "model": "6.0K-25A-3P",
+  "nominalPower": null
+ },
+ {
+  "acVoltageMax": null,
+  "acVoltageMin": null,
+  "brand": "Wattsonic",
+  "function": 2,
+  "model": "8.0K-25A-3P",
+  "nominalPower": null
+ }
+]
