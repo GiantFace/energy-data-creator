@@ -78,11 +78,46 @@ function uniqueSuffix(d: Date): string {
   return base;
 }
 
-// 33 karakteres szintetikus POD; az előtag a DSO-ból jön (EHE000120 -> HU000120…).
-function pod(i: number, dso: string): string {
-  const num = dso.toUpperCase().startsWith('EHE') ? dso.slice(3) : dso;
-  const s = 'HU' + num + 'SYN' + String(i).padStart(5, '0');
-  return (s + '0'.repeat(33)).slice(0, 33);
+// A POD-ok VALÓDIAK (a DSO/registry adja ki) – a generátor nem gyárt POD-ot, mert a DDR
+// formátum-validátora (checksum/minta) a kitalált POD-okat „Invalid POD format”-tal elutasítja.
+// A POD-számból viszont levezethető a DSO-kód: HU + 6 jegyű DSO-kód (pl. HU000210… -> EHE000210).
+export function dsoNoFromPod(pod: string): string {
+  const p = (pod ?? '').trim().toUpperCase();
+  const digits = p.slice(2, 8); // a HU utáni 6 jegyű DSO-azonosító
+  return /^[0-9]{6}$/.test(digits) ? `EHE${digits}` : 'EHE000000';
+}
+
+// A POD-törzs tisztítása: nagybetűs [A-Z0-9-] (a doc-mintában kötőjel is van), max 25 karakter.
+export function sanitizePodBody(raw: string): string {
+  return (raw ?? '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 25);
+}
+
+// A DSO-kódból az előtag: HU + 6 jegyű DSO-azonosító (pl. EHE000910 -> HU000910). Mindig 8 karakter.
+function podPrefix(dso: string): string {
+  const raw = dso.toUpperCase().startsWith('EHE') ? dso.slice(3) : dso.replace(/\D/g, '');
+  return 'HU' + raw.slice(0, 6).padEnd(6, '0');
+}
+
+// Sorszámozott POD a master-data elvárt formátumában: HU + 6 jegyű DSO-kód + törzs + sorszám,
+// ahol a sorszám NULLÁVAL TÖLTI KI a maradékot, hogy a POD PONTOSAN 33 karakter legyen.
+//   Példa: HU000310 + F11-S + 00000000000000000001 = HU000310F11-S00000000000000000001 (33 kar.)
+// (A korábbi 32 karakteres ...TESZT001 ezért bukott „Invalid POD format”-tal a master-datán.)
+export function generatePods(count: number, dso: string, body: string): string[] {
+  const n = Math.max(0, Math.floor(count) || 0);
+  const prefix = podPrefix(dso); // 8 karakter
+  // A törzset úgy korlátozzuk, hogy a sorszámnak legalább 1 hely maradjon a 33 karakteren belül.
+  const b = sanitizePodBody(body).slice(0, Math.max(0, 33 - prefix.length - 1));
+  const seqWidth = 33 - prefix.length - b.length; // a sorszám kitölti a maradékot → összesen 33
+  const out: string[] = [];
+  for (let i = 1; i <= n; i++) {
+    out.push(prefix + b + String(i).padStart(seqWidth, '0'));
+  }
+  return out;
+}
+
+// Stabil minta a felülethez (az 1. POD), hogy a felhasználó élőben lássa a végeredményt.
+export function examplePodTemplate(dso: string, body: string): string {
+  return generatePods(1, dso, body)[0] ?? '';
 }
 
 // Az inverter (HMKE) eszköz fix adatcsatornái a master-data formátumhoz.
@@ -99,11 +134,12 @@ const INVERTER_CHANNELS: { obisCode: string; dataChannelName: string; unit: stri
   { obisCode: 'X.1.8.0', dataChannelName: 'HMKE termelésből saját célra történő felhasználás', unit: 'kWh' },
 ];
 
-function szinkronRow(i: number, dso: string): string {
-  const p = pod(i, dso);
+// A POD-ot kívülről kapja (a közös, beillesztett `pods` készletből) – így a SZINKRON, a MAVIR
+// és az inverter MINDIG bájtra azonos POD-okat használ. Az [Eloszto] a POD-ból levezetett DSO.
+function szinkronRow(p: string, i: number): string {
   const fogyhely = String(199700000 + i);
   return [
-    '2024.09.01', '2040.12.31', dso, TRADER, BALANCE_EIC, p, fogyhely,
+    '2024.09.01', '2040.12.31', dsoNoFromPod(p), TRADER, BALANCE_EIC, p, fogyhely,
     '0.0', 'IDOS', '2026.05.01', '10.01', '10.01', 'Teszt', `Ugyfel${i}`, 'Teszt utca', String(i),
     'Budapest', '1011', 'K', 'KOF', 'VIZUGY', 'KOF_A_KIF_T', '60,0000000', '1',
     '2023.01.09', '2021.03.01', '1+0', 'HMKE-02', '001', '1.0', '2025.08.01', '2025.08.01',
@@ -136,14 +172,14 @@ function buildMavirXml(pods: string[], from: Date, end: Date, generated: Date): 
 }
 
 // Inverter párosítás – a master-data (podContracts) formátum, amit a dso-controller elfogad.
-// A POD-hoz egy 'meter' funkciójú eszköz az inverter brand/model/teljesítmény adataival és
+// A POD-hoz egy 'inverter' funkciójú eszköz az inverter brand/model/teljesítmény adataival és
 // a 10 fix HMKE adatcsatornával.
-function buildInverterJson(pods: string[], dso: string, spec: InverterSpec): string {
+function buildInverterJson(pods: string[], spec: InverterSpec): string {
   const install = spec.installationDate;
   const podContracts = pods.map((p, idx) => ({
     pod: p,
     utilityType: 'electricity',
-    dsoNo: dso,
+    dsoNo: dsoNoFromPod(p),
     address: {
       zipCode: '1011',
       city: 'Budapest',
@@ -156,7 +192,7 @@ function buildInverterJson(pods: string[], dso: string, spec: InverterSpec): str
       {
         serialNumber: `${p}_INV`,
         deviceType: {
-          function: 'meter',
+          function: 'inverter',
           brand: spec.brand,
           model: spec.model,
           nominalPower: spec.nominalPower,
@@ -180,33 +216,38 @@ function buildInverterJson(pods: string[], dso: string, spec: InverterSpec): str
   return JSON.stringify({ podContracts }, null, 2);
 }
 
-// Közös generálás: a kipipált kimenetek, mind ugyanarra a POD-készletre.
+// Közös generálás: a kipipált kimenetek, mind UGYANARRA a beillesztett (valódi) POD-készletre.
 export function generateBundle(
-  count: number,
-  dso: string,
+  pods: string[],
   from: Date,
+  genDate: Date,
   outputs: Outputs,
   invSpec: InverterSpec,
 ): BundleResult {
-  count = Math.max(1, Math.floor(count));
   let { szinkron, meres, inverter } = outputs;
   if (!szinkron && !meres && !inverter) { szinkron = true; meres = true; }
 
   const now = new Date();
   if (from.getTime() >= now.getTime()) from = new Date(now.getTime() - 24 * 3600_000);
+  // A SZINKRON fájlnév Datum2 mezője (generálás dátuma) – paraméterezhető (doc); a parser dátumként olvassa.
+  if (!(genDate instanceof Date) || isNaN(genDate.getTime())) genDate = now;
 
-  const pods = Array.from({ length: count }, (_, k) => pod(k + 1, dso));
+  const count = pods.length;
   const files: GeneratedFile[] = [];
   let points = 0;
   let invDevices = 0;
 
-  // Közös, egyedi időbélyeg az egész generáláshoz (minden fájl neve ezzel egyedi).
+  // Közös, egyedi időbélyeg az egész generáláshoz (a MAVIR/inverter fájlnév ezzel egyedi).
   const suffix = uniqueSuffix(now);
+  // A fájlnevekhez egy DSO-kód kell – az első POD-ból vezetjük le (jellemzően mind ugyanaz a DSO).
+  const dso = count ? dsoNoFromPod(pods[0]) : 'EHE000000';
 
   if (szinkron) {
-    const lines = [HEADER, ...Array.from({ length: count }, (_, k) => szinkronRow(k + 1, dso))];
+    const lines = [HEADER, ...pods.map((p, k) => szinkronRow(p, k + 1))];
+    // A parser a fájlnév VÉGÉN két 8-jegyű dátumot vár: <szelekció YYYYMMDD>_<generálás YYYYMMDD>.
+    // Idő (HHMMSS) ide INVALID_FORMAT-ot okoz, ezért itt NEM az egyedi időbélyeget használjuk.
     files.push({
-      name: `Szinkron_${dso}_${TRADER}_${suffix}.csv`,
+      name: `Szinkron_${dso}_${TRADER}_${ymd(from)}_${ymd(genDate)}.csv`,
       content: lines.join('\r\n') + '\r\n',
       mime: 'text/csv',
       target: 'sftp',
@@ -232,7 +273,7 @@ export function generateBundle(
     invDevices = count;
     files.push({
       name: `inverter_master-data_${suffix}.json`,
-      content: buildInverterJson(pods, dso, invSpec),
+      content: buildInverterJson(pods, invSpec),
       mime: 'application/json',
       target: 'swagger',
       hint: 'Inverter párosítás – másold a Swagger (congestMasterData) request body-ba',

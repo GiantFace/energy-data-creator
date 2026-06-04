@@ -10,7 +10,14 @@ export type IconName =
   | 'external'
   | 'cookie'
   | 'copy'
-  | 'check';
+  | 'check'
+  | 'trash'
+  | 'archive'
+  | 'database'
+  | 'chevron-left'
+  | 'chevron-right'
+  | 'chevron-down'
+  | 'grip';
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const c = {
@@ -99,6 +106,54 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     case 'check':
       return (
         <svg {...c}><polyline points="20 6 9 17 4 12" /></svg>
+      );
+    case 'trash':
+      return (
+        <svg {...c}>
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          <line x1="10" y1="11" x2="10" y2="17" />
+          <line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+      );
+    case 'archive':
+      return (
+        <svg {...c}>
+          <polyline points="21 8 21 21 3 21 3 8" />
+          <rect x="1" y="3" width="22" height="5" />
+          <line x1="10" y1="12" x2="14" y2="12" />
+        </svg>
+      );
+    case 'database':
+      return (
+        <svg {...c}>
+          <ellipse cx="12" cy="5" rx="9" ry="3" />
+          <path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+          <path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6" />
+        </svg>
+      );
+    case 'chevron-left':
+      return (
+        <svg {...c}><polyline points="15 18 9 12 15 6" /></svg>
+      );
+    case 'chevron-right':
+      return (
+        <svg {...c}><polyline points="9 18 15 12 9 6" /></svg>
+      );
+    case 'chevron-down':
+      return (
+        <svg {...c}><polyline points="6 9 12 15 18 9" /></svg>
+      );
+    case 'grip':
+      return (
+        <svg {...c} fill="currentColor" stroke="none">
+          <circle cx="9" cy="6" r="1.5" />
+          <circle cx="15" cy="6" r="1.5" />
+          <circle cx="9" cy="12" r="1.5" />
+          <circle cx="15" cy="12" r="1.5" />
+          <circle cx="9" cy="18" r="1.5" />
+          <circle cx="15" cy="18" r="1.5" />
+        </svg>
       );
   }
 }
