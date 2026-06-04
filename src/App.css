@@ -70,7 +70,8 @@ body {
 }
 .nav-item:hover { background: var(--hover); }
 .nav-item.active { background: var(--accent); color: #fff; font-weight: 600; }
-.nav-ic { font-size: 16px; }
+.nav-ic { display: inline-flex; align-items: center; justify-content: center; opacity: 0.9; }
+.nav-item.active .nav-ic { opacity: 1; }
 
 .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .version { text-align: center; font-size: 12px; color: var(--muted); }
@@ -116,14 +117,14 @@ html[data-theme='dark'] input[type='date'] { color-scheme: dark; }
 .check input { width: 18px; height: 18px; accent-color: var(--accent); }
 
 button { font-family: inherit; font-size: 14px; border-radius: 10px; cursor: pointer; border: none; transition: background 0.15s ease, opacity 0.15s ease; }
-.primary { background: var(--accent); color: #fff; font-weight: 600; padding: 11px 20px; margin-top: 16px; }
+.primary { background: var(--accent); color: #fff; font-weight: 600; padding: 11px 20px; margin-top: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .primary:hover { background: var(--accent-strong); }
 .primary.sm { padding: 8px 14px; margin: 0; }
 
 .ghost {
   background: var(--surface); color: var(--ink);
   border: 1px solid var(--input-border); padding: 9px 14px;
-  text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+  text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
 }
 .ghost:hover { background: var(--hover); }
 .ghost.sm { padding: 8px 12px; font-size: 13px; }
@@ -149,6 +150,7 @@ button { font-family: inherit; font-size: 14px; border-radius: 10px; cursor: poi
   border-radius: 14px; box-shadow: var(--shadow);
   padding: 15px 18px; display: flex; gap: 16px; align-items: center;
 }
+.cookie-ic { display: inline-flex; align-items: center; color: var(--accent); flex-shrink: 0; }
 .cookie-text { font-size: 13px; line-height: 1.5; color: var(--ink); flex: 1; }
 
 .credit {

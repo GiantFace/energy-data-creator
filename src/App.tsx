@@ -9,6 +9,7 @@ import {
   type InverterSpec,
 } from './lib/generators';
 import { getCookie, setCookie } from './lib/cookies';
+import { Icon, type IconName } from './Icons';
 import './App.css';
 
 const APP_VERSION = 'v1.0.0';
@@ -72,7 +73,7 @@ export default function App() {
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
 
   const greeting = useMemo(
-    () => (name.trim() ? `Üdv, ${name.trim()}! 👋` : 'POD-ok, mérés és inverter generálása'),
+    () => (name.trim() ? `Üdv, ${name.trim()}!` : 'POD-ok, mérés és inverter generálása'),
     [name],
   );
 
@@ -99,10 +100,10 @@ export default function App() {
   const targetLabel = (t: string) => (t === 'swagger' ? 'Swagger UI' : 'SFTP web kliens');
   const targetUrl = (t: string) => (t === 'swagger' ? swaggerUrl : sftpUrl);
 
-  const nav: { id: View; icon: string; label: string }[] = [
-    { id: 'generate', icon: '⚡', label: 'Generálás' },
-    { id: 'settings', icon: '⚙️', label: 'Beállítások' },
-    { id: 'about', icon: 'ℹ️', label: 'Névjegy' },
+  const nav: { id: View; icon: IconName; label: string }[] = [
+    { id: 'generate', icon: 'zap', label: 'Generálás' },
+    { id: 'settings', icon: 'settings', label: 'Beállítások' },
+    { id: 'about', icon: 'info', label: 'Névjegy' },
   ];
 
   return (
@@ -135,13 +136,14 @@ export default function App() {
                 className={`nav-item${view === n.id ? ' active' : ''}`}
                 onClick={() => setView(n.id)}
               >
-                <span className="nav-ic">{n.icon}</span> {n.label}
+                <span className="nav-ic"><Icon name={n.icon} size={18} /></span> {n.label}
               </button>
             ))}
           </nav>
           <div className="side-foot">
             <button className="ghost block" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-              {theme === 'dark' ? '☀  Világos téma' : '🌙  Sötét téma'}
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
+              {theme === 'dark' ? 'Világos téma' : 'Sötét téma'}
             </button>
             <div className="version">{APP_VERSION}</div>
           </div>
@@ -225,8 +227,8 @@ export default function App() {
                           <div className="rhint">{f.hint} · {f.meta}</div>
                         </div>
                         <div className="ractions">
-                          <button className="primary sm" onClick={() => download(f)}>⬇ Letöltés</button>
-                          <a className="ghost sm" href={targetUrl(f.target)} target="_blank" rel="noreferrer">↗ {targetLabel(f.target)}</a>
+                          <button className="primary sm" onClick={() => download(f)}><Icon name="download" size={15} /> Letöltés</button>
+                          <a className="ghost sm" href={targetUrl(f.target)} target="_blank" rel="noreferrer"><Icon name="external" size={15} /> {targetLabel(f.target)}</a>
                         </div>
                       </div>
                     ))}
@@ -280,8 +282,9 @@ export default function App() {
 
       {!cookieOk && (
         <div className="cookie-banner" role="dialog" aria-label="Cookie tájékoztató">
+          <span className="cookie-ic"><Icon name="cookie" size={22} /></span>
           <div className="cookie-text">
-            🍪 Ez az oldal <b>funkcionális sütiket</b> használ a beállításaid (pl. a köszöntéshez megadott <b>név</b>,
+            Ez az oldal <b>funkcionális sütiket</b> használ a beállításaid (pl. a köszöntéshez megadott <b>név</b>,
             a téma és az URL-ek) megjegyzésére. Követés nincs.
           </div>
           <button className="primary sm" onClick={() => { setCookie('cookie_consent', '1'); setCookieOk(true); }}>
