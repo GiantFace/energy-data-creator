@@ -85,9 +85,19 @@ function pod(i: number, dso: string): string {
   return (s + '0'.repeat(33)).slice(0, 33);
 }
 
-function synthAddress(i: number) {
-  return { zipCode: '1011', city: 'Budapest', street: 'Teszt utca', building: String(i), country: 'HU' };
-}
+// Az inverter (HMKE) eszköz fix adatcsatornái a master-data formátumhoz.
+const INVERTER_CHANNELS: { obisCode: string; dataChannelName: string; unit: string }[] = [
+  { obisCode: '13.7.0', dataChannelName: 'Inverter teljesítmény tényező', unit: '1' },
+  { obisCode: '2.8.0', dataChannelName: 'HMKE termelt energia (kWh)', unit: 'kWh' },
+  { obisCode: '31.7.0', dataChannelName: 'Áramerősség L1 fázison', unit: 'A' },
+  { obisCode: '32.7.0', dataChannelName: 'Feszültség L1 fázison', unit: 'V' },
+  { obisCode: '51.7.0', dataChannelName: 'Áramerősség L2 fázison', unit: 'A' },
+  { obisCode: '52.7.0', dataChannelName: 'Feszültség L2 fázison', unit: 'V' },
+  { obisCode: '71.7.0', dataChannelName: 'Áramerősség L3 fázison', unit: 'A' },
+  { obisCode: '72.7.0', dataChannelName: 'Feszültség L3 fázison', unit: 'V' },
+  { obisCode: '9.7.0', dataChannelName: 'HMKE termelési teljesítmény (kVA)', unit: 'kVA' },
+  { obisCode: 'X.1.8.0', dataChannelName: 'HMKE termelésből saját célra történő felhasználás', unit: 'kWh' },
+];
 
 function szinkronRow(i: number, dso: string): string {
   const p = pod(i, dso);
@@ -125,19 +135,49 @@ function buildMavirXml(pods: string[], from: Date, end: Date, generated: Date): 
   return { xml: sb, points };
 }
 
-function buildInverterJson(pods: string[], spec: InverterSpec): string {
-  const devices = pods.map((p, idx) => ({
-    serialNumber: p + '_INV',
-    address: synthAddress(idx + 1),
-    brand: spec.brand,
-    model: spec.model,
-    nominalPower: spec.nominalPower,
-    acVoltageMin: spec.acVoltageMin,
-    acVoltageMax: spec.acVoltageMax,
-    installationDate: spec.installationDate,
-    removalDate: null,
+// Inverter párosítás – a master-data (podContracts) formátum, amit a dso-controller elfogad.
+// A POD-hoz egy 'meter' funkciójú eszköz az inverter brand/model/teljesítmény adataival és
+// a 10 fix HMKE adatcsatornával.
+function buildInverterJson(pods: string[], dso: string, spec: InverterSpec): string {
+  const install = spec.installationDate;
+  const podContracts = pods.map((p, idx) => ({
+    pod: p,
+    utilityType: 'electricity',
+    dsoNo: dso,
+    address: {
+      zipCode: '1011',
+      city: 'Budapest',
+      street: 'Teszt',
+      streetType: 'utca',
+      streetCode: String(idx + 1),
+      country: 'HU',
+    },
+    devices: [
+      {
+        serialNumber: `${p}_INV`,
+        deviceType: {
+          function: 'meter',
+          brand: spec.brand,
+          model: spec.model,
+          nominalPower: spec.nominalPower,
+          acVoltageMin: spec.acVoltageMin,
+          acVoltageMax: spec.acVoltageMax,
+        },
+        isSettlement: true,
+        installationDate: install,
+        dataChannels: INVERTER_CHANNELS.map((c) => ({
+          obisCode: c.obisCode,
+          dataChannelName: c.dataChannelName,
+          integrationPeriod: '5',
+          unit: c.unit,
+          validFrom: install,
+          validUntil: null,
+          status: 'W',
+        })),
+      },
+    ],
   }));
-  return JSON.stringify({ devices });
+  return JSON.stringify({ podContracts }, null, 2);
 }
 
 // Közös generálás: a kipipált kimenetek, mind ugyanarra a POD-készletre.
@@ -191,12 +231,12 @@ export function generateBundle(
   if (inverter) {
     invDevices = count;
     files.push({
-      name: `inverter-brand_master-data_${suffix}.json`,
-      content: buildInverterJson(pods, invSpec),
+      name: `inverter_master-data_${suffix}.json`,
+      content: buildInverterJson(pods, dso, invSpec),
       mime: 'application/json',
       target: 'swagger',
-      hint: 'Inverter – másold a Swagger request body-ba',
-      meta: `${count} eszköz (serialNumber = POD + _INV)`,
+      hint: 'Inverter párosítás – másold a Swagger (congestMasterData) request body-ba',
+      meta: `${count} POD, ${INVERTER_CHANNELS.length} HMKE csatorna`,
     });
   }
 
