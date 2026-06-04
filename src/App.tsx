@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { zipSync, strToU8 } from 'fflate';
 import logo from './assets/logo.webp';
 import DotField from './DotField';
@@ -7,6 +7,10 @@ import {
   generateBundle,
   generatePods,
   examplePodTemplate,
+  mavirXmlChunks,
+  mavirFileName,
+  buildEnergyReport,
+  reportFileName,
   type GeneratedFile,
   type InverterSpec,
 } from './lib/generators';
@@ -75,7 +79,8 @@ function parsePods(text: string): string[] {
 function download(file: GeneratedFile) {
   // application/octet-stream → a böngésző MINDIG letölti, nem nyitja meg előnézetben
   // (ez fordulhatott elő az XML-nél). A tényleges típus a kiterjesztésből (.xml/.csv/.json) látszik.
-  const blob = new Blob([file.content], { type: 'application/octet-stream' });
+  // Nagy fájlnál a kész Blob-ot használjuk (nincs óriási sztring a memóriában).
+  const blob = file.blob ?? new Blob([file.content], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -92,7 +97,7 @@ function download(file: GeneratedFile) {
 // Fogd-és-vidd a böngészőből egy mappába/asztalra (Chrome/Edge: DownloadURL).
 // Onnan a fájl behúzható az SFTP „Upload Files” drop-zónájába (közvetlenül a másik fülbe nem lehet).
 function dragOutFile(e: React.DragEvent, file: GeneratedFile) {
-  const blob = new Blob([file.content], { type: 'application/octet-stream' });
+  const blob = file.blob ?? new Blob([file.content], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   try {
     e.dataTransfer.setData('DownloadURL', `application/octet-stream:${file.name}:${url}`);
@@ -106,8 +111,11 @@ function dragOutFile(e: React.DragEvent, file: GeneratedFile) {
 
 // Az összes generált fájl egyetlen ZIP-be csomagolva, böngészőben (fflate – nincs szerver).
 function downloadZip(files: GeneratedFile[]) {
+  // A nagy (Blob-ként tárolt) MAVIR fájl nem kerül a ZIP-be – azt külön, közvetlenül töltsd le.
+  const zippable = files.filter((f) => !f.blob);
+  if (!zippable.length) return;
   const entries: Record<string, Uint8Array> = {};
-  for (const f of files) entries[f.name] = strToU8(f.content);
+  for (const f of zippable) entries[f.name] = strToU8(f.content);
   const zipped = zipSync(entries, { level: 6 });
   const blob = new Blob([zipped as BlobPart], { type: 'application/zip' });
   const url = URL.createObjectURL(blob);
@@ -126,6 +134,11 @@ function downloadZip(files: GeneratedFile[]) {
 
 // A generált fájlok megőrzése oldal-újratöltésnél (localStorage – túléli a frissítést is).
 const FILES_KEY = 'enap_generated_files';
+
+// A MAVIR mérés felső korlátja: ennél több adatpontból a böngésző nem tud egy fájlt építeni
+// (~80 karakter/pont → string-méret/memória korlát). E felett a generálás nem indul el.
+const MAVIR_POINTS_CAP = 2_000_000;
+const FIFTEEN_MIN_MS = 15 * 60_000;
 
 function loadStoredFiles(): GeneratedFile[] | null {
   try {
@@ -171,6 +184,7 @@ export default function App() {
   const [szinkron, setSzinkron] = useState(true);
   const [meres, setMeres] = useState(true);
   const [inverter, setInverter] = useState(false);
+  const [allowLarge, setAllowLarge] = useState(false);
 
   const [brand, setBrand] = useState(FIRST_BRAND);
   const initModel = DEVICE_TYPES[FIRST_BRAND]?.[0];
@@ -199,11 +213,16 @@ export default function App() {
   const [files, setFiles] = useState<GeneratedFile[] | null>(loadStoredFiles);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState('');
+  const [toast, setToast] = useState<{ pct: number; done: boolean } | null>(null);
+  const runRef = useRef(0);
 
-  // A generált fájlokat megőrizzük újratöltésnél; üres lista esetén töröljük.
+  // A generált fájlokat megőrizzük újratöltésnél; üres/nagyon nagy lista esetén nem.
   useEffect(() => {
     try {
-      if (files && files.length) localStorage.setItem(FILES_KEY, JSON.stringify(files));
+      const totalLen = (files ?? []).reduce((s, f) => s + f.content.length, 0);
+      const hasBlob = (files ?? []).some((f) => f.blob);
+      // A nagy (Blob-os / sok hónapos MAVIR) fájlt nem tesszük localStorage-ba (nem szerializálható / kvóta) – csak letölthető.
+      if (files && files.length && totalLen <= 3_000_000 && !hasBlob) localStorage.setItem(FILES_KEY, JSON.stringify(files));
       else localStorage.removeItem(FILES_KEY);
     } catch {
       /* localStorage tele / nem elérhető – a letöltés/másolás így is működik */
@@ -218,6 +237,15 @@ export default function App() {
   // A felismert POD-ok és a gyanús (nem 33 karakteres) elemek.
   const realPods = useMemo(() => parsePods(podsText), [podsText]);
   const badPods = useMemo(() => realPods.filter((p) => p.length > 33), [realPods]);
+
+  // A generálandó POD-ok száma (a választott mód szerint) és a becsült MAVIR adatpontok száma.
+  const podCount = podMode === 'auto' ? Math.max(0, parseInt(count, 10) || 0) : realPods.length;
+  const mavirPoints = useMemo(() => {
+    if (!meres || !from) return 0;
+    const fromMs = new Date(from + 'T00:00:00').getTime();
+    const intervals = Math.max(0, Math.floor((Date.now() - fromMs) / FIFTEEN_MIN_MS));
+    return podCount * intervals;
+  }, [meres, from, podCount]);
 
   async function copyText(text: string, key: string) {
     try {
@@ -244,7 +272,7 @@ export default function App() {
     [name],
   );
 
-  function onGenerate() {
+  async function onGenerate() {
     setError('');
     let pods: string[];
     if (podMode === 'auto') {
@@ -257,6 +285,15 @@ export default function App() {
     }
     if (!from) { setError('Válassz érvényes mérés-kezdő dátumot.'); return; }
     if (!szinkron && !meres && !inverter) { setError('Pipálj ki legalább egy kimenetet.'); return; }
+    if (meres && mavirPoints > MAVIR_POINTS_CAP && !allowLarge) {
+      setError(
+        `Túl nagy MAVIR adatmennyiség: ~${mavirPoints.toLocaleString('hu-HU')} adatpont ` +
+          `(${podCount} POD × 15 perces idősor). Pipáld be a „Nagy generálás engedélyezése” négyzetet, ha ` +
+          `mindenképp ennyit szeretnél (lassú lehet, és nagyon nagy méretnél a böngésző akár el is szállhat), ` +
+          `vagy válassz későbbi mérés-kezdő dátumot / kevesebb POD-ot.`,
+      );
+      return;
+    }
 
     const spec: InverterSpec = {
       brand,
@@ -268,8 +305,88 @@ export default function App() {
     };
     const fromDate = new Date(from + 'T00:00:00');
     const genDateD = new Date((genDate || today()) + 'T00:00:00');
-    const res = generateBundle(pods, fromDate, genDateD, { szinkron, meres, inverter }, spec);
-    setFiles(res.files);
+
+    // Nagy MAVIR + támogatott böngésző → közvetlenül LEMEZRE streameljük (nincs memória-összeomlás).
+    const largeMavir = meres && mavirPoints > MAVIR_POINTS_CAP;
+    const canStream = typeof (window as unknown as { showSaveFilePicker?: unknown }).showSaveFilePicker === 'function';
+    if (largeMavir && canStream) {
+      await generateStreamed(pods, fromDate, genDateD, spec);
+      return;
+    }
+
+    const myRun = ++runRef.current;
+    setToast({ pct: 0, done: false });
+    try {
+      const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres, inverter }, spec, (frac) => {
+        if (runRef.current === myRun) setToast({ pct: Math.round(frac * 100), done: false });
+      });
+      if (runRef.current !== myRun) return; // időközben új generálás indult
+      setFiles(res.files);
+      setToast({ pct: 100, done: true });
+      setTimeout(() => { if (runRef.current === myRun) setToast(null); }, 4000);
+    } catch {
+      if (runRef.current === myRun) { setToast(null); setError('Hiba történt a generálás közben.'); }
+    }
+  }
+
+  // Nagy MAVIR: a böngésző egy save-dialógusban kéri a helyet, majd ~1 MB-os darabokban a LEMEZRE írja
+  // (a memóriában mindig csak egy darab van), így tetszőleges méret sem szállítja el a fület.
+  async function generateStreamed(pods: string[], fromDate: Date, genDateD: Date, spec: InverterSpec) {
+    const suggested = mavirFileName(pods);
+    let writable: { write: (s: string) => Promise<void>; close: () => Promise<void>; abort?: () => Promise<void> };
+    let savedName = suggested;
+    try {
+      const picker = (window as unknown as {
+        showSaveFilePicker: (o: unknown) => Promise<{ name: string; createWritable: () => Promise<typeof writable> }>;
+      }).showSaveFilePicker;
+      const handle = await picker({
+        suggestedName: suggested,
+        types: [{ description: 'MAVIR mérés (XML)', accept: { 'application/xml': ['.xml'] } }],
+      });
+      savedName = handle.name || suggested;
+      writable = await handle.createWritable();
+    } catch {
+      return; // a felhasználó megszakította a mentést – nem hiba
+    }
+
+    const myRun = ++runRef.current;
+    setToast({ pct: 0, done: false });
+    try {
+      // SZINKRON + inverter (gyors, memóriában) – MAVIR nélkül; a MAVIR-t streameljük.
+      const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres: false, inverter }, spec);
+      const now = new Date();
+      const sums: number[] = new Array(pods.length).fill(0);
+      for await (const chunk of mavirXmlChunks(pods, fromDate, now, now, (frac) => {
+        if (runRef.current === myRun) setToast({ pct: Math.round(frac * 100), done: false });
+      }, sums)) {
+        await writable.write(chunk);
+      }
+      await writable.close();
+      if (runRef.current !== myRun) return;
+      const mavirInfo: GeneratedFile = {
+        name: savedName,
+        content: '',
+        mime: 'text/xml',
+        target: 'sftp',
+        hint: 'MAVIR mérés – közvetlenül lemezre mentve',
+        meta: `${pods.length} POD · streamelt`,
+        savedToDisk: true,
+      };
+      const report: GeneratedFile = {
+        name: reportFileName(),
+        content: buildEnergyReport(pods, sums, fromDate, now, now),
+        mime: 'text/plain',
+        target: 'report',
+        hint: 'Energia-összesítő (POD ↔ inverter ↔ kWh) a MAVIR mérésből',
+        meta: `${pods.length} POD`,
+      };
+      setFiles([...res.files, mavirInfo, report]);
+      setToast({ pct: 100, done: true });
+      setTimeout(() => { if (runRef.current === myRun) setToast(null); }, 4000);
+    } catch {
+      try { await writable.abort?.(); } catch { /* ignore */ }
+      if (runRef.current === myRun) { setToast(null); setError('Hiba a MAVIR lemezre írása közben.'); }
+    }
   }
 
   const targetLabel = (t: string) => (t === 'swagger' ? 'Swagger UI' : 'SFTP web kliens');
@@ -446,6 +563,22 @@ export default function App() {
                   <label className="check"><input type="checkbox" checked={inverter} onChange={(e) => setInverter(e.target.checked)} /> <span>Inverter hozzárendelés (JSON) → Swagger</span></label>
                 </div>
 
+                {meres && mavirPoints > 300_000 && (
+                  <p className={`hint${mavirPoints > MAVIR_POINTS_CAP ? ' warn' : ''}`}>
+                    MAVIR: ~<b>{mavirPoints.toLocaleString('hu-HU')}</b> adatpont készülne ({podCount} POD × 15 perces idősor).
+                    {mavirPoints > MAVIR_POINTS_CAP
+                      ? ` ⚠ Több a böngészőnek ajánlott ~${MAVIR_POINTS_CAP.toLocaleString('hu-HU')}-nál — engedélyezd alább, vagy rövidíts.`
+                      : ' Nagy fájl lesz, a generálás eltarthat egy ideig (a folyamatjelző mutatja).'}
+                  </p>
+                )}
+
+                {meres && mavirPoints > MAVIR_POINTS_CAP && (
+                  <label className="check" style={{ marginTop: 6 }}>
+                    <input type="checkbox" checked={allowLarge} onChange={(e) => setAllowLarge(e.target.checked)} />
+                    <span>Nagy generálás engedélyezése (lassú lehet, extrém méretnél a böngésző elszállhat)</span>
+                  </label>
+                )}
+
                 {error && <p className="error">{error}</p>}
                 <button className="primary" onClick={onGenerate}>Generálás</button>
               </section>
@@ -542,24 +675,34 @@ export default function App() {
                       <div className="result-row" key={f.name}>
                         <div
                           className="rfile"
-                          draggable
-                          onDragStart={(e) => dragOutFile(e, f)}
-                          title="Fogd és húzd egy mappába / az asztalra (Chrome/Edge), majd onnan az SFTP-be"
+                          draggable={!f.savedToDisk}
+                          onDragStart={f.savedToDisk ? undefined : (e) => dragOutFile(e, f)}
+                          title={f.savedToDisk ? 'Ez a fájl már a lemezre lett mentve' : 'Fogd és húzd egy mappába / az asztalra (Chrome/Edge), majd onnan az SFTP-be'}
                         >
-                          <span className="rgrip" aria-hidden="true"><Icon name="grip" size={16} /></span>
+                          {!f.savedToDisk && <span className="rgrip" aria-hidden="true"><Icon name="grip" size={16} /></span>}
                           <div className="rfile-text">
                             <div className="rname">{f.name}</div>
                             <div className="rhint">{f.hint} · {f.meta}</div>
                           </div>
                         </div>
                         <div className="ractions">
-                          <button className="primary sm" onClick={() => download(f)}><Icon name="download" size={15} /> Letöltés</button>
-                          <button className="ghost sm" onClick={() => copyText(f.content, f.name)}>
-                            {copied === f.name
-                              ? <><Icon name="check" size={15} /> Másolva</>
-                              : <><Icon name="copy" size={15} /> Másolás</>}
-                          </button>
-                          <a className="ghost sm" href={targetUrl(f.target)} target="_blank" rel="noreferrer"><Icon name="external" size={15} /> {targetLabel(f.target)}</a>
+                          {f.savedToDisk ? (
+                            <span className="saved-badge"><Icon name="check" size={15} /> Lemezre mentve</span>
+                          ) : (
+                            <>
+                              <button className="primary sm" onClick={() => download(f)}><Icon name="download" size={15} /> Letöltés</button>
+                              {!f.blob && (
+                                <button className="ghost sm" onClick={() => copyText(f.content, f.name)}>
+                                  {copied === f.name
+                                    ? <><Icon name="check" size={15} /> Másolva</>
+                                    : <><Icon name="copy" size={15} /> Másolás</>}
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {f.target !== 'report' && (
+                            <a className="ghost sm" href={targetUrl(f.target)} target="_blank" rel="noreferrer"><Icon name="external" size={15} /> {targetLabel(f.target)}</a>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -628,6 +771,22 @@ export default function App() {
           <button className="primary sm" onClick={() => { setCookie('cookie_consent', '1'); setCookieOk(true); }}>
             Elfogadom
           </button>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`toast${toast.done ? ' done' : ''}`} role="status" aria-live="polite">
+          <span className="toast-ic">
+            {toast.done ? <Icon name="check" size={18} /> : <span className="toast-spin" aria-hidden="true" />}
+          </span>
+          <div className="toast-body">
+            <div className="toast-title">
+              {toast.done ? 'Kész ✓' : `Fájlok létrehozása… ${toast.pct}%`}
+            </div>
+            {!toast.done && (
+              <div className="toast-bar"><div className="toast-bar-fill" style={{ width: `${toast.pct}%` }} /></div>
+            )}
+          </div>
         </div>
       )}
 

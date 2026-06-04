@@ -41,11 +41,15 @@ export type Outputs = { szinkron: boolean; meres: boolean; inverter: boolean };
 
 export type GeneratedFile = {
   name: string;
-  content: string;
+  content: string; // szöveges tartalom (CSV/JSON/TXT); nagy MAVIR-nál üres, helyette `blob`
   mime: string;
-  target: 'sftp' | 'swagger';
+  target: 'sftp' | 'swagger' | 'report';
   hint: string;
   meta: string;
+  // Nagy fájl (sok hónapos MAVIR): a tartalom Blob-ként, mert egy ekkora sztring meghaladná a böngésző korlátját.
+  blob?: Blob;
+  // Nagyon nagy fájl: közvetlenül lemezre streamelve (nincs memóriában) – csak info-bejegyzés a listában.
+  savedToDisk?: boolean;
 };
 
 export type BundleResult = { pods: number; points: number; invDevices: number; files: GeneratedFile[] };
@@ -146,29 +150,103 @@ function szinkronRow(p: string, i: number): string {
   ].join('|');
 }
 
-function buildMavirXml(pods: string[], from: Date, end: Date, generated: Date): { xml: string; points: number } {
-  let sb = "<?xml version='1.0' encoding='UTF-8'?>\r\n";
-  sb += '<EDW_XML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://tempuri.org/MAVIR">\r\n';
-  sb += '    <HEADER>\r\n        <VERSION>1.0</VERSION>\r\n        <GENERATOR>WM_XML_Generator</GENERATOR>\r\n';
-  sb += `        <GENERATED-DATETIME>${isoLocal(generated)}</GENERATED-DATETIME>\r\n    </HEADER>\r\n`;
+// A MAVIR XML-t ~1 MB-os szövegdarabokban állítja elő (async generator). Így soha nincs egyetlen
+// óriási sztring a memóriában – egyenesen lemezre streamelhető (File System Access API) anélkül,
+// hogy a böngésző-fül kifogyna a memóriából. onProgress 0..1 közötti törtet jelez.
+export async function* mavirXmlChunks(
+  pods: string[],
+  from: Date,
+  end: Date,
+  generated: Date,
+  onProgress?: (frac: number) => void,
+  sums?: number[], // POD-onkénti energiaösszeg (kWh) – az összesítő TXT-hez, generálás közben gyűjtve
+): AsyncGenerator<string, void, unknown> {
+  const stepMs = 15 * 60_000;
+  const perPod = Math.max(0, Math.floor((end.getTime() - from.getTime()) / stepMs));
+  const total = Math.max(1, pods.length * perPod);
+  let buf =
+    "<?xml version='1.0' encoding='UTF-8'?>\r\n" +
+    '<EDW_XML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://tempuri.org/MAVIR">\r\n' +
+    '    <HEADER>\r\n        <VERSION>1.0</VERSION>\r\n        <GENERATOR>WM_XML_Generator</GENERATOR>\r\n' +
+    `        <GENERATED-DATETIME>${isoLocal(generated)}</GENERATED-DATETIME>\r\n    </HEADER>\r\n`;
   let points = 0;
-  for (const p of pods) {
-    sb += '    <DATA>\r\n';
-    sb += `        <LOC-KEY>${p}</LOC-KEY>\r\n`;
-    sb += '        <CHANNEL-NAME>A+</CHANNEL-NAME>\r\n';
-    sb += `        <VALUE-NAME>${MEAS_OBIS}</VALUE-NAME>\r\n`;
-    sb += '        <VALUE-UNIT>kwh</VALUE-UNIT>\r\n        <T-FACTOR>1</T-FACTOR>\r\n        <INTERVAL>00:15:00</INTERVAL>\r\n';
-    sb += '        <BLOCK>\r\n';
-    sb += `            <START-DATETIME>${isoLocal(from)}</START-DATETIME>\r\n`;
-    for (let t = from.getTime(); t < end.getTime(); t += 15 * 60_000) {
+  let lastTick = Date.now();
+  for (let i = 0; i < pods.length; i++) {
+    const p = pods[i];
+    buf += '    <DATA>\r\n';
+    buf += `        <LOC-KEY>${p}</LOC-KEY>\r\n`;
+    buf += '        <CHANNEL-NAME>A+</CHANNEL-NAME>\r\n';
+    buf += `        <VALUE-NAME>${MEAS_OBIS}</VALUE-NAME>\r\n`;
+    buf += '        <VALUE-UNIT>kwh</VALUE-UNIT>\r\n        <T-FACTOR>1</T-FACTOR>\r\n        <INTERVAL>00:15:00</INTERVAL>\r\n';
+    buf += '        <BLOCK>\r\n';
+    buf += `            <START-DATETIME>${isoLocal(from)}</START-DATETIME>\r\n`;
+    for (let t = from.getTime(); t < end.getTime(); t += stepMs) {
       const v = (100 + Math.random() * 1400).toFixed(2);
-      sb += `            <E>\r\n                <V>${v}</V>\r\n                <F2>W</F2>\r\n            </E>\r\n`;
+      if (sums) sums[i] = (sums[i] ?? 0) + Number(v);
+      buf += `            <E>\r\n                <V>${v}</V>\r\n                <F2>W</F2>\r\n            </E>\r\n`;
       points++;
+      if (buf.length >= 1_000_000) {
+        onProgress?.(points / total);
+        yield buf;
+        buf = '';
+        if (Date.now() - lastTick > 40) { lastTick = Date.now(); await new Promise<void>((r) => setTimeout(r)); }
+      }
     }
-    sb += '        </BLOCK>\r\n    </DATA>\r\n';
+    buf += '        </BLOCK>\r\n    </DATA>\r\n';
   }
-  sb += '</EDW_XML>';
-  return { xml: sb, points };
+  buf += '</EDW_XML>';
+  onProgress?.(1);
+  yield buf;
+}
+
+// POD ↔ inverter ↔ összesített energia (A+ / kWh) szöveges riport a MAVIR mérésből.
+export function buildEnergyReport(pods: string[], sums: number[], from: Date, end: Date, generated: Date): string {
+  const perPod = Math.max(0, Math.floor((end.getTime() - from.getTime()) / (15 * 60_000)));
+  const fmt = (n: number) => n.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const lines: string[] = [];
+  lines.push('ENAP - KEP — Energia-összesítő (a MAVIR mérés alapján)');
+  lines.push(`Generálva:  ${isoLocal(generated)}`);
+  lines.push(`Mérés:      ${isoLocal(from)} → ${isoLocal(end)}  (15 perces felbontás)`);
+  lines.push('Csatorna:   A+ (aktív energia / fogyasztás) · egység: kWh');
+  lines.push(`Pont/POD:   ${perPod}`);
+  lines.push('');
+  lines.push(`${'POD'.padEnd(35)}${'Inverter (serialNumber)'.padEnd(40)}${'Energia (kWh)'.padStart(20)}`);
+  lines.push('-'.repeat(95));
+  let grand = 0;
+  for (let i = 0; i < pods.length; i++) {
+    const e = sums[i] ?? 0;
+    grand += e;
+    lines.push(`${pods[i].padEnd(35)}${(pods[i] + '_INV').padEnd(40)}${fmt(e).padStart(20)}`);
+  }
+  lines.push('-'.repeat(95));
+  lines.push(`Összesen: ${pods.length} POD · ${fmt(grand)} kWh`);
+  return lines.join('\r\n') + '\r\n';
+}
+
+export function reportFileName(): string {
+  return `energia_osszesito_${uniqueSuffix(new Date())}.txt`;
+}
+
+// A MAVIR fájl neve a megszokott formátumban (a lemezre-mentés javasolt neveként és a listához).
+export function mavirFileName(pods: string[]): string {
+  const dso = pods.length ? dsoNoFromPod(pods[0]) : 'EHE000000';
+  return `${dso}_${TRADER}_Eseti_FF_EGYEDI1_${uniqueSuffix(new Date())}.xml`;
+}
+
+// In-memory Blob (kis/közepes MAVIR, vagy ha nincs lemez-streamelés) – a chunk-generátorból építve.
+async function buildMavirXml(
+  pods: string[],
+  from: Date,
+  end: Date,
+  generated: Date,
+  onProgress?: (frac: number) => void,
+  sums?: number[],
+): Promise<{ blob: Blob; points: number }> {
+  const stepMs = 15 * 60_000;
+  const perPod = Math.max(0, Math.floor((end.getTime() - from.getTime()) / stepMs));
+  const blobParts: BlobPart[] = [];
+  for await (const chunk of mavirXmlChunks(pods, from, end, generated, onProgress, sums)) blobParts.push(chunk);
+  return { blob: new Blob(blobParts, { type: 'application/octet-stream' }), points: pods.length * perPod };
 }
 
 // Inverter párosítás – a master-data (podContracts) formátum, amit a dso-controller elfogad.
@@ -217,13 +295,15 @@ function buildInverterJson(pods: string[], spec: InverterSpec): string {
 }
 
 // Közös generálás: a kipipált kimenetek, mind UGYANARRA a beillesztett (valódi) POD-készletre.
-export function generateBundle(
+// Aszinkron, hogy a MAVIR-építés közben a UI (folyamatjelző) frissülhessen, és nagy adatnál ne fagyjon le.
+export async function generateBundle(
   pods: string[],
   from: Date,
   genDate: Date,
   outputs: Outputs,
   invSpec: InverterSpec,
-): BundleResult {
+  onProgress?: (frac: number) => void,
+): Promise<BundleResult> {
   let { szinkron, meres, inverter } = outputs;
   if (!szinkron && !meres && !inverter) { szinkron = true; meres = true; }
 
@@ -236,6 +316,7 @@ export function generateBundle(
   const files: GeneratedFile[] = [];
   let points = 0;
   let invDevices = 0;
+  onProgress?.(0);
 
   // Közös, egyedi időbélyeg az egész generáláshoz (a MAVIR/inverter fájlnév ezzel egyedi).
   const suffix = uniqueSuffix(now);
@@ -257,16 +338,28 @@ export function generateBundle(
   }
 
   if (meres) {
-    const { xml, points: pts } = buildMavirXml(pods, from, now, now);
+    const sums: number[] = new Array(count).fill(0);
+    const { blob, points: pts } = await buildMavirXml(pods, from, now, now, onProgress, sums);
     points = pts;
     files.push({
       name: `${dso}_${TRADER}_Eseti_FF_EGYEDI1_${suffix}.xml`,
-      content: xml,
+      content: '',
+      blob,
       mime: 'text/xml',
       target: 'sftp',
       hint: 'MAVIR mérés – töltsd fel az SFTP-re',
       meta: `${count} POD, ${pts} pont`,
     });
+    files.push({
+      name: `energia_osszesito_${suffix}.txt`,
+      content: buildEnergyReport(pods, sums, from, now, now),
+      mime: 'text/plain',
+      target: 'report',
+      hint: 'Energia-összesítő (POD ↔ inverter ↔ kWh) a MAVIR mérésből',
+      meta: `${count} POD`,
+    });
+  } else {
+    onProgress?.(0.5);
   }
 
   if (inverter) {
@@ -281,5 +374,6 @@ export function generateBundle(
     });
   }
 
+  onProgress?.(1);
   return { pods: count, points, invDevices, files };
 }
