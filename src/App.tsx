@@ -136,14 +136,15 @@ export default function App() {
                 className={`nav-item${view === n.id ? ' active' : ''}`}
                 onClick={() => setView(n.id)}
               >
-                <span className="nav-ic"><Icon name={n.icon} size={18} /></span> {n.label}
+                <span className="nav-ic"><Icon name={n.icon} size={18} /></span>
+                <span className="nav-lbl">{n.label}</span>
               </button>
             ))}
           </nav>
           <div className="side-foot">
-            <button className="ghost block" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            <button className="ghost block theme-btn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
-              {theme === 'dark' ? 'Világos téma' : 'Sötét téma'}
+              <span className="btn-lbl">{theme === 'dark' ? 'Világos téma' : 'Sötét téma'}</span>
             </button>
             <div className="version">{APP_VERSION}</div>
           </div>
