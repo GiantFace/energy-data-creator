@@ -221,7 +221,7 @@ export function generateBundle(
     files.push({
       name: `${dso}_${TRADER}_Eseti_FF_EGYEDI1_${suffix}.xml`,
       content: xml,
-      mime: 'application/xml',
+      mime: 'text/xml',
       target: 'sftp',
       hint: 'MAVIR mérés – töltsd fel az SFTP-re',
       meta: `${count} POD, ${pts} pont`,

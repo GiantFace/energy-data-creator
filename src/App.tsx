@@ -90,6 +90,17 @@ export default function App() {
 
   const [files, setFiles] = useState<GeneratedFile[] | null>(null);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState('');
+
+  async function copy(file: GeneratedFile) {
+    try {
+      await navigator.clipboard.writeText(file.content);
+      setCopied(file.name);
+      setTimeout(() => setCopied(''), 1600);
+    } catch {
+      setError('A vágólapra másolás nem sikerült (a böngésző blokkolta).');
+    }
+  }
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
 
@@ -249,7 +260,14 @@ export default function App() {
               {files && files.length > 0 && (
                 <section className="card">
                   <h2>Generált fájlok</h2>
-                  <p className="desc">A bal oldalon a fájl (töltsd le), a jobb oldalon a felület, ahova be kell tölteni.</p>
+                  <p className="desc">
+                    Töltsd le vagy másold a fájlt, majd a jobb oldali linken nyisd meg a felületet, ahova be kell tölteni.
+                  </p>
+                  <p className="safe-note">
+                    <Icon name="check" size={14} /> A fájlok egyszerű <b>szövegfájlok</b> (CSV / XML / JSON) – ártalmatlanok.
+                    Ha a böngésző letöltéskor figyelmeztet, az a friss domain miatti téves jelzés. A <b>JSON</b>-t a
+                    „Másolás” gombbal letöltés nélkül is beillesztheted a Swaggerbe.
+                  </p>
                   <div className="results">
                     {files.map((f) => (
                       <div className="result-row" key={f.name}>
@@ -259,6 +277,11 @@ export default function App() {
                         </div>
                         <div className="ractions">
                           <button className="primary sm" onClick={() => download(f)}><Icon name="download" size={15} /> Letöltés</button>
+                          <button className="ghost sm" onClick={() => copy(f)}>
+                            {copied === f.name
+                              ? <><Icon name="check" size={15} /> Másolva</>
+                              : <><Icon name="copy" size={15} /> Másolás</>}
+                          </button>
                           <a className="ghost sm" href={targetUrl(f.target)} target="_blank" rel="noreferrer"><Icon name="external" size={15} /> {targetLabel(f.target)}</a>
                         </div>
                       </div>

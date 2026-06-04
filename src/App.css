@@ -94,6 +94,14 @@ body {
 .desc { color: var(--muted); font-size: 13px; line-height: 1.55; margin: 4px 0 18px; }
 .hint { color: var(--muted); font-size: 12.5px; margin: 8px 0 4px; }
 
+.safe-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12.5px; line-height: 1.5; color: var(--muted);
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; margin: 0 0 16px;
+}
+.safe-note svg { color: #16a34a; flex-shrink: 0; margin-top: 2px; }
+
 /* Automatikusan újratördelődő rács – a hely függvényében kevesebb oszlop,
    a min(100%, …) megakadályozza a túlcsordulást nagyon kis kijelzőn is. */
 .grid2, .grid3 { display: grid; gap: 14px 16px; }
