@@ -126,7 +126,7 @@ export function examplePodTemplate(dso: string, body: string): string {
 
 // Az inverter (HMKE) eszköz fix adatcsatornái a master-data formátumhoz.
 const INVERTER_CHANNELS: { obisCode: string; dataChannelName: string; unit: string }[] = [
-  { obisCode: '13.7.0', dataChannelName: 'Inverter teljesítmény tényező', unit: '1' },
+  { obisCode: '13.7.0', dataChannelName: 'Inverter teljesítmény tényező', unit: '' },
   { obisCode: '2.8.0', dataChannelName: 'HMKE termelt energia (kWh)', unit: 'kWh' },
   { obisCode: '31.7.0', dataChannelName: 'Áramerősség L1 fázison', unit: 'A' },
   { obisCode: '32.7.0', dataChannelName: 'Feszültség L1 fázison', unit: 'V' },

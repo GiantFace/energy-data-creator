@@ -39,3 +39,4 @@ Thumbs.db
 *.docx
 api_schema.txt
 tesztbetoltes/
+pgweb-*.json
