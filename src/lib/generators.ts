@@ -35,21 +35,38 @@ export type InverterSpec = {
   acVoltageMin: number;
   acVoltageMax: number;
   installationDate: string; // yyyy-MM-dd
+  customerMail: string;     // a párosítás (RabbitMQ) customerMail mezője
 };
 
-export type Outputs = { szinkron: boolean; meres: boolean; inverter: boolean; invMeres: boolean; invPair: boolean };
+export type Outputs = { szinkron: boolean; meres: boolean; inverter: boolean; invMeres: boolean; invPair: boolean; msconst: boolean };
+
+// MSCONST: MAVIR EDW_XML, de NEM idősor – POD-onként EGY konstans érték (egy <BLOCK>/egy <E>).
+// A LOC-KEY a generált POD; az érték véletlen [valueMin, valueMax] tartományból; a többi mező szerkeszthető.
+export type MsconstSpec = {
+  channelName: string;
+  valueName: string;
+  valueUnit: string;
+  tFactor: string;
+  interval: string;
+  f2: string;
+  startDateTime: string; // 'YYYY-MM-DDTHH:mm:ss'
+  valueMin: number;
+  valueMax: number;
+};
 
 export type GeneratedFile = {
   name: string;
   content: string; // szöveges tartalom (CSV/JSON/TXT); nagy MAVIR-nál üres, helyette `blob`
   mime: string;
-  target: 'sftp' | 'swagger' | 'measurement' | 'report' | 'rabbit';
+  target: 'sftp' | 'swagger' | 'measurement' | 'report' | 'rabbit' | 'msconst';
   hint: string;
   meta: string;
   // Nagy fájl (sok hónapos MAVIR): a tartalom Blob-ként, mert egy ekkora sztring meghaladná a böngésző korlátját.
   blob?: Blob;
   // Nagyon nagy fájl: közvetlenül lemezre streamelve (nincs memóriában) – csak info-bejegyzés a listában.
   savedToDisk?: boolean;
+  // Inverter serialNumber (…_INV) – a mongo-express ellenőrző linkhez (a beküldés sikere).
+  serial?: string;
 };
 
 export type BundleResult = { pods: number; points: number; invDevices: number; files: GeneratedFile[] };
@@ -169,6 +186,46 @@ function szinkronRow(p: string, i: number, merlegkor: string): string {
   ].join('|');
 }
 
+// A SZINKRON oszlopnevei (a [...] zárójeleket levéve) – a parser fejléc hiányában ezt használja fallbacknek.
+export const SZINKRON_COLUMNS = HEADER.split('|').map((c) => c.replace(/^\[|\]$/g, ''));
+
+export type SzinkronParsed = { columns: string[]; rows: Record<string, string>[] };
+
+// SZINKRON CSV beolvasása: a fejléc ([...] sor) átugorva/feldolgozva, a pipe-delimitált sorok mező-objektumokká.
+// Ha van bracketes fejléc, annak oszlopneveit használja; egyébként a SZINKRON_COLUMNS fallbacket.
+export function parseSzinkron(text: string): SzinkronParsed {
+  const lines = text.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.length > 0);
+  if (!lines.length) return { columns: SZINKRON_COLUMNS, rows: [] };
+  let columns = SZINKRON_COLUMNS;
+  let start = 0;
+  const first = lines[0];
+  if (first.includes('[') && /\[[^\]]+\]/.test(first)) {
+    columns = first.split('|').map((c) => c.trim().replace(/^\[|\]$/g, ''));
+    start = 1;
+  }
+  const rows: Record<string, string>[] = [];
+  for (let i = start; i < lines.length; i++) {
+    const cells = lines[i].split('|');
+    const row: Record<string, string> = {};
+    columns.forEach((col, ci) => { row[col] = (cells[ci] ?? '').trim(); });
+    rows.push(row);
+  }
+  return { columns, rows };
+}
+
+// A parsolt SZINKRON sorokból a generáláshoz fontos mezők (POD, FOGYHELY_AZON=poc, mérlegkör, eloszto).
+export type SzinkronRowKey = { pod: string; poc: string; merlegkor: string; eloszto: string };
+export function szinkronKeyRows(rows: Record<string, string>[]): SzinkronRowKey[] {
+  return rows
+    .map((r) => ({
+      pod: r['POD'] ?? '',
+      poc: r['FOGYHELY_AZON'] ?? '',
+      merlegkor: r['Merlegkor_Felelos'] ?? '',
+      eloszto: r['Eloszto'] ?? '',
+    }))
+    .filter((r) => r.pod);
+}
+
 // A MAVIR XML-t ~1 MB-os szövegdarabokban állítja elő (async generator). Így soha nincs egyetlen
 // óriási sztring a memóriában – egyenesen lemezre streamelhető (File System Access API) anélkül,
 // hogy a böngésző-fül kifogyna a memóriából. onProgress 0..1 közötti törtet jelez.
@@ -250,6 +307,40 @@ export function reportFileName(): string {
 export function mavirFileName(pods: string[], merlegkor?: string): string {
   const dso = pods.length ? dsoNoFromPod(pods[0]) : 'EHE000000';
   return `${dso}_${fileSafePartner(merlegkor || BALANCE_EIC)}_Eseti_FF_EGYEDI1_${uniqueSuffix(new Date())}.xml`;
+}
+
+// MSCONST: MAVIR EDW_XML konstans értékekkel – POD-onként egy <DATA> egyetlen <E>-vel.
+// Kicsi fájl (1 érték/POD), ezért szinkron, nincs streamelés. A V érték véletlen, 3 tizedessel (mint a minta).
+export function buildMsconst(pods: string[], spec: MsconstSpec, generated: Date): string {
+  const head =
+    "<?xml version='1.0' encoding='UTF-8'?>\r\n" +
+    '<EDW_XML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://tempuri.org/MAVIR">\r\n' +
+    '    <HEADER>\r\n        <VERSION>1.0</VERSION>\r\n        <GENERATOR>WM_XML_Generator</GENERATOR>\r\n' +
+    `        <GENERATED-DATETIME>${isoLocal(generated)}</GENERATED-DATETIME>\r\n    </HEADER>\r\n`;
+  const lo = Math.min(spec.valueMin, spec.valueMax);
+  const span = Math.max(0, spec.valueMax - spec.valueMin);
+  let buf = head;
+  for (const p of pods) {
+    const v = (lo + Math.random() * span).toFixed(3);
+    buf += '    <DATA>\r\n';
+    buf += `        <LOC-KEY>${p}</LOC-KEY>\r\n`;
+    buf += `        <CHANNEL-NAME>${spec.channelName}</CHANNEL-NAME>\r\n`;
+    buf += `        <VALUE-NAME>${spec.valueName}</VALUE-NAME>\r\n`;
+    buf += `        <VALUE-UNIT>${spec.valueUnit}</VALUE-UNIT>\r\n`;
+    buf += `        <T-FACTOR>${spec.tFactor}</T-FACTOR>\r\n`;
+    buf += `        <INTERVAL>${spec.interval}</INTERVAL>\r\n`;
+    buf += '        <BLOCK>\r\n';
+    buf += `            <START-DATETIME>${spec.startDateTime}</START-DATETIME>\r\n`;
+    buf += `            <E>\r\n                <V>${v}</V>\r\n                <F2>${spec.f2}</F2>\r\n            </E>\r\n`;
+    buf += '        </BLOCK>\r\n    </DATA>\r\n';
+  }
+  buf += '</EDW_XML>';
+  return buf;
+}
+
+export function msconstFileName(pods: string[], merlegkor?: string): string {
+  const dso = pods.length ? dsoNoFromPod(pods[0]) : 'EHE000000';
+  return `${dso}_${fileSafePartner(merlegkor || BALANCE_EIC)}_MSCONST_${uniqueSuffix(new Date())}.xml`;
 }
 
 // MAVIR darabolási terv: ~80 bájt/adatpont + ~320 bájt/POD. ~1 GB felett POD-onként több részre bontunk
@@ -340,13 +431,15 @@ const PAIRING_CHANNELS: { obisCode: string; name: string; unit: string }[] = [
 
 // Inverter PÁROSÍTÁS üzenet a RabbitMQ `pod-registry.inverter-pod-data` queue-hoz (egy POD / üzenet).
 // EZ az, ami a pod↔eszköz párosítást létrehozza a pod-registry-ben (a Mongo `messages` formátuma szerint).
-function inverterPairingObj(pod: string, spec: InverterSpec, idx: number) {
+function inverterPairingObj(pod: string, spec: InverterSpec, idx: number, pocOverride?: string) {
   const install = spec.installationDate;
   return {
     pod,
-    // A POC-szám = a SZINKRON FOGYHELY_AZON-ja (199700000 + sorszám) → ez a POD PocNo-ja a registry-ben.
-    // E nélkül (null) a párosítás nem társítja a mérési helyet/címet az inverterhez.
-    poc: fogyhelyAzon(idx + 1),
+    // A POC-szám = a SZINKRON FOGYHELY_AZON-ja → ez a POD PocNo-ja a registry-ben. E nélkül (null) a
+    // párosítás nem társítja a mérési helyet. Importált SZINKRON-nál a fájl valódi FOGYHELY_AZON-ja (pocOverride),
+    // egyébként a számított érték (199700000 + sorszám).
+    poc: pocOverride || fogyhelyAzon(idx + 1),
+    customerMail: spec.customerMail,
     utilityType: 'electricity',
     address: {
       zipCode: '1011',
@@ -387,15 +480,15 @@ function inverterPairingObj(pod: string, spec: InverterSpec, idx: number) {
   };
 }
 
-// Egy POD párosítás-üzenete JSON-ként.
-function buildInverterPairing(pod: string, spec: InverterSpec, idx: number): string {
-  return JSON.stringify(inverterPairingObj(pod, spec, idx), null, 2);
+// Egy POD párosítás-üzenete: { podContracts: [ … ] } wrapper, TÖMÖR (minified) – a RabbitMQ
+// érzékeny a sortörésre/whitespace-re, ezért nem szépítjük. __TypeId__ = …MasterDataMainDto.
+function buildInverterPairing(pod: string, spec: InverterSpec, idx: number, pocOverride?: string): string {
+  return JSON.stringify({ podContracts: [inverterPairingObj(pod, spec, idx, pocOverride)] });
 }
 
-// MINDEN POD párosítása egyetlen JSON tömbben (a „sum" kimenethez – egy üzenetként publikálható,
-// ha a consumer elfogadja a tömböt).
-function buildInverterPairingAll(pods: string[], spec: InverterSpec): string {
-  return JSON.stringify(pods.map((p, idx) => inverterPairingObj(p, spec, idx)), null, 2);
+// MINDEN POD párosítása egyetlen { podContracts: [ … ] } üzenetben (a „sum" kimenethez) – tömör.
+function buildInverterPairingAll(pods: string[], spec: InverterSpec, pocs?: string[]): string {
+  return JSON.stringify({ podContracts: pods.map((p, idx) => inverterPairingObj(p, spec, idx, pocs?.[idx])) });
 }
 
 // ISO-8601 UTC, ezredmásodperc nélkül (a mérés-DTO <date-time> formátuma, pl. 2026-06-09T08:00:00Z).
@@ -438,10 +531,12 @@ export async function generateBundle(
   outputs: Outputs,
   invSpec: InverterSpec,
   merlegkor: string,
+  msconstSpec: MsconstSpec,
   onProgress?: (frac: number) => void,
+  pocs?: string[], // importált SZINKRON esetén POD-onkénti FOGYHELY_AZON (a párosítás poc-ja); egyébként undefined
 ): Promise<BundleResult> {
-  let { szinkron, meres, inverter, invMeres, invPair } = outputs;
-  if (!szinkron && !meres && !inverter && !invMeres && !invPair) { szinkron = true; meres = true; }
+  let { szinkron, meres, inverter, invMeres, invPair, msconst } = outputs;
+  if (!szinkron && !meres && !inverter && !invMeres && !invPair && !msconst) { szinkron = true; meres = true; }
 
   const now = new Date();
   if (from.getTime() >= now.getTime()) from = new Date(now.getTime() - 24 * 3600_000);
@@ -543,24 +638,36 @@ export async function generateBundle(
     pods.forEach((p, idx) => {
       files.push({
         name: `inverter_parositas_${idx + 1}_${suffix}.json`,
-        content: buildInverterPairing(p, invSpec, idx),
+        content: buildInverterPairing(p, invSpec, idx, pocs?.[idx]),
         mime: 'application/json',
         target: 'rabbit',
         hint: 'Inverter párosítás → RabbitMQ pod-registry.inverter-pod-data (Management UI → Publish → Payload)',
         meta: `1 POD · RabbitMQ`,
+        serial: `${p}_INV`,
       });
     });
     // „Sum": minden párosítás egyetlen JSON tömbben (1-nél több POD esetén) – egy üzenetként publikálható.
     if (count > 1) {
       files.push({
         name: `inverter_parositas_OSSZES_${suffix}.json`,
-        content: buildInverterPairingAll(pods, invSpec),
+        content: buildInverterPairingAll(pods, invSpec, pocs),
         mime: 'application/json',
         target: 'rabbit',
         hint: 'Inverter párosítás – ÖSSZES egy JSON tömbben (egy üzenetként, ha a consumer elfogadja a tömböt)',
         meta: `${count} POD egyben · RabbitMQ`,
       });
     }
+  }
+
+  if (msconst) {
+    files.push({
+      name: msconstFileName(pods, mkf),
+      content: buildMsconst(pods, msconstSpec, now),
+      mime: 'text/xml',
+      target: 'msconst',
+      hint: 'MSCONST (MAVIR EDW_XML, konstans érték / POD) – töltsd fel az SFTP-re',
+      meta: `${count} POD`,
+    });
   }
 
   onProgress?.(1);

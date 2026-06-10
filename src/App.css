@@ -150,6 +150,49 @@ body {
 .panel-chevron { padding: 6px 8px; }
 .side-panel .check-sql { margin-top: 12px; }
 
+.card-foot { display: flex; justify-content: flex-end; margin-top: 18px; }
+
+/* Összecsukható kártya fejléce: a teljes sor kattintható, jobbra a chevron */
+.card-collapse-head { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; color: inherit; text-align: left; }
+.card-collapse-head h2 { margin: 0; }
+.card-collapse-head:hover { opacity: 0.85; }
+/* „Generálás" gomb az inverter-rács utolsó sorában, a sor JOBB széléhez igazítva (a mezők aljához) */
+.gen-cell { grid-column-end: -1; display: flex; align-items: flex-end; justify-content: flex-end; }
+.gen-cell button { width: auto; }
+
+/* Feltöltött SZINKRON lap */
+.drop-zone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 28px; border: 2px dashed var(--input-border); border-radius: 12px; color: var(--muted); text-align: center; }
+.drop-zone .file-pick { cursor: pointer; }
+.sz-list { display: flex; flex-direction: column; gap: 8px; }
+.sz-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--input-border); border-radius: 10px; flex-wrap: wrap; }
+.sz-item.active { border-color: var(--accent); }
+.sz-item-name { font-weight: 600; color: var(--ink); }
+.sz-item-meta { font-size: 12px; color: var(--muted); }
+.sz-table-wrap { overflow-x: auto; margin-top: 12px; border: 1px solid var(--input-border); border-radius: 10px; max-height: 460px; }
+.sz-table { border-collapse: collapse; font-size: 12px; }
+.sz-table th { position: sticky; top: 0; background: var(--input-bg); padding: 6px 8px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--input-border); color: var(--muted); }
+.sz-table td { padding: 2px 4px; border-bottom: 1px solid var(--input-border); }
+.sz-table td.sz-rownum { color: var(--muted); text-align: right; padding-right: 8px; }
+.sz-table input { width: 130px; font-size: 12px; padding: 4px 6px; }
+/* szebb alsó/oldalsó görgő (a .pods-input stílusát követve) */
+.sz-table-wrap { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.sz-table-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+.sz-table-wrap::-webkit-scrollbar-track { background: transparent; }
+.sz-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; border: 2px solid var(--input-bg); }
+.sz-table-wrap::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+/* kijelölő + törlés oszlopok */
+.sz-table .sz-selcol { width: 34px; text-align: center; }
+.sz-table .sz-selcol input { width: auto; }
+.sz-table .sz-delcol { width: 30px; text-align: center; }
+.sz-del-btn { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 3px; border-radius: 6px; display: inline-flex; }
+.sz-del-btn:hover { color: #e5484d; background: rgba(229, 72, 77, 0.12); }
+.sz-row-sel { background: rgba(99, 102, 241, 0.08); }
+.sz-row-sel td.sz-rownum { color: var(--accent); }
+
+.mongo-list { display: flex; flex-direction: column; gap: 6px; }
+.mongo-item { justify-content: flex-start; max-width: 100%; }
+.mongo-serial { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+
 .check-block { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
 .check-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .check-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
@@ -246,6 +289,7 @@ input[type='date'] { color-scheme: light; }
 html[data-theme='dark'] input[type='date'] { color-scheme: dark; }
 
 .checks { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 6px; }
+.check-row { display: flex; flex-wrap: wrap; gap: 10px 24px; }
 .check { flex-direction: row; align-items: center; gap: 10px; font-size: 14px; color: var(--ink); cursor: pointer; }
 .check input { width: 18px; height: 18px; accent-color: var(--accent); }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { zipSync, strToU8 } from 'fflate';
 import logo from './assets/logo.webp';
 import DotField from './DotField';
@@ -13,8 +13,11 @@ import {
   mavirFileNames,
   buildEnergyReport,
   reportFileName,
+  parseSzinkron,
+  szinkronKeyRows,
   type GeneratedFile,
   type InverterSpec,
+  type MsconstSpec,
 } from './lib/generators';
 import { DEVICE_BRANDS, DEVICE_TYPES, type DeviceModel } from './lib/deviceTypes';
 import { getCookie, setCookie } from './lib/cookies';
@@ -25,13 +28,15 @@ const APP_VERSION = 'v1.0.0';
 
 const DEFAULT_SFTP = 'https://sftp.uat.enap.oci/web/client/files';
 const DEFAULT_SWAGGER =
-  'https://device-data-receiver.uat.enap.oci/swagger/swagger-ui/index.html#/inverter-controller/receiveMasterDataFromManufacturer';
+  'https://device-data-receiver.uat.enap.oci/swagger/swagger-ui/index.html#/inverter-controller/receiveMasterDataFromManufacturer_1';
 // Inverter MÉRÉSADAT (v1.2 inverter-controller) – külön a párosítás (master-data) végpontjától.
 const DEFAULT_SWAGGER_MEAS =
   'https://device-data-receiver.uat.enap.oci/swagger/swagger-ui/index.html#/inverter-controller/receiveMeasurementData_3';
 const PGWEB_URL = 'https://pgweb-ui.uat.enap.oci/#';
 // RabbitMQ Management UI – ide kell publikálni az inverter-párosítást (pod-registry.inverter-pod-data).
 const DEFAULT_RABBIT = 'https://rabbitmq-ui.uat.enap.oci/#/exchanges';
+// mongo-express (pod-registry-db Messages) – az inverter beküldés sikere a serialNumber alapján.
+const DEFAULT_MONGO = 'https://pod-registry-mongodb-express.uat.enap.oci/db/pod-registry-db/Messages';
 
 // Feltöltés-ellenőrző SQL a pgweb-hez (file-processor-db → public.file_metadata).
 // A DONE státusz a file_processed_status oszlopban jelzi a sikeres feldolgozást.
@@ -97,6 +102,7 @@ function randomPodBody(): string {
 const FILE_GROUPS: { key: string; label: string }[] = [
   { key: 'szinkron', label: 'SZINKRON törzsadat (CSV) → SFTP' },
   { key: 'mavir', label: 'MAVIR mérés (XML) → SFTP' },
+  { key: 'msconst', label: 'MSCONST (MAVIR EDW_XML, konstans) → SFTP' },
   { key: 'master', label: 'Inverter gyártói törzsadat → Swagger' },
   { key: 'pair', label: 'Inverter párosítás → RabbitMQ' },
   { key: 'meas', label: 'Inverter mérésadat (v1.2) → Swagger' },
@@ -106,9 +112,24 @@ function fileGroup(f: GeneratedFile): string {
     case 'rabbit': return 'pair';
     case 'measurement': return 'meas';
     case 'swagger': return 'master';
+    case 'msconst': return 'msconst';
     case 'report': return 'mavir'; // energia-összesítő a MAVIR mellett
     default: return f.mime === 'text/csv' || f.name.startsWith('Szinkron') ? 'szinkron' : 'mavir';
   }
+}
+
+// Összecsukható kártya: a fejlécre kattintva nyílik/csukódik. Generálás után a rendszer
+// automatikusan összecsukja őket, hogy a lekérdezések/eredmények jobban láthatóak legyenek.
+function CollapsibleCard({ title, collapsed, onToggle, children }: { title: string; collapsed: boolean; onToggle: () => void; children: ReactNode }) {
+  return (
+    <section className="card">
+      <button className="card-collapse-head" onClick={onToggle} aria-expanded={!collapsed}>
+        <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={18} />
+        <h2>{title}</h2>
+      </button>
+      {!collapsed && children}
+    </section>
+  );
 }
 
 function download(file: GeneratedFile) {
@@ -234,7 +255,10 @@ function useLocalBool(key: string, initial: boolean) {
   return [v, setV] as const;
 }
 
-type View = 'generate' | 'settings' | 'about';
+type View = 'generate' | 'szinkron' | 'settings' | 'about';
+
+// Egy feltöltött (és szerkeszthető) SZINKRON profil – böngésző-cache-ben (localStorage), nincs DB.
+type SavedSzinkron = { id: string; name: string; createdAt: string; columns: string[]; rows: Record<string, string>[]; selectedPods?: string[] };
 
 export default function App() {
   const [theme, setTheme] = useCookie('theme', 'light');
@@ -243,6 +267,7 @@ export default function App() {
   const [swaggerUrl, setSwaggerUrl] = useCookie('swaggerUrl', DEFAULT_SWAGGER);
   const [swaggerMeasUrl, setSwaggerMeasUrl] = useCookie('swaggerMeasUrl', DEFAULT_SWAGGER_MEAS);
   const [rabbitUrl, setRabbitUrl] = useCookie('rabbitUrl', DEFAULT_RABBIT);
+  const [mongoUrl, setMongoUrl] = useCookie('mongoUrl', DEFAULT_MONGO);
 
   const [view, setView] = useState<View>('generate');
   const [cookieOk, setCookieOk] = useState(() => {
@@ -251,9 +276,23 @@ export default function App() {
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [mongoOpen, setMongoOpen] = useState(true);
+  // A bal oldali konfig-kártyák összecsukása (generálás után automatikusan összecsukódnak).
+  const [genCol, setGenCol] = useState(false);
+  const [invCol, setInvCol] = useState(false);
+  const [msCol, setMsCol] = useState(false);
 
   // POD-forrás: automatikus generálás vagy valódi POD-ok beillesztése. (Mind megőrződik frissítésnél.)
   const [podMode, setPodMode] = useLocalStorage('podMode', 'auto');
+  // Feltöltött SZINKRON profilok – böngésző-cache-ben (localStorage), reload-állóan.
+  const [savedSz, setSavedSz] = useState<SavedSzinkron[]>(() => {
+    try { return JSON.parse(localStorage.getItem('enap_savedSzinkron') || '[]'); } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('enap_savedSzinkron', JSON.stringify(savedSz)); } catch { /* tele lehet a tár */ }
+  }, [savedSz]);
+  const [selectedSzId, setSelectedSzId] = useLocalStorage('selectedSzId', ''); // a generáláshoz kiválasztott
+  const [editSzId, setEditSzId] = useState<string>(''); // a SZINKRON-lapon épp szerkesztett
   const [count, setCount] = useLocalStorage('count', '5');
   const [dso, setDso] = useLocalStorage('dso', 'EHE000210');
   const [merlegkor, setMerlegkor] = useLocalStorage('merlegkor', '15X-SINERGY----D');
@@ -269,6 +308,17 @@ export default function App() {
   const [inverter, setInverter] = useLocalBool('inverter', false);
   const [invMeres, setInvMeres] = useLocalBool('invMeres', false);
   const [invPair, setInvPair] = useLocalBool('invPair', false);
+  const [msconst, setMsconst] = useLocalBool('msconst', false);
+  // MSCONST mezők (alapból a minta értékei, szerkeszthetők)
+  const [msChannel, setMsChannel] = useLocalStorage('msChannel', 'A+');
+  const [msValueName, setMsValueName] = useLocalStorage('msValueName', '1.29.99.145');
+  const [msUnit, setMsUnit] = useLocalStorage('msUnit', 'kwh');
+  const [msTFactor, setMsTFactor] = useLocalStorage('msTFactor', '1');
+  const [msInterval, setMsInterval] = useLocalStorage('msInterval', '00:05:00');
+  const [msF2, setMsF2] = useLocalStorage('msF2', 'W');
+  const [msStart, setMsStart] = useLocalStorage('msStart', '2026-03-22T12:00');
+  const [msMin, setMsMin] = useLocalStorage('msMin', '100');
+  const [msMax, setMsMax] = useLocalStorage('msMax', '1500');
   const [allowLarge, setAllowLarge] = useState(false);
 
   const initModel = DEVICE_TYPES[FIRST_BRAND]?.[0];
@@ -278,6 +328,7 @@ export default function App() {
   const [vmin, setVmin] = useLocalStorage('vmin', str(initModel?.acVoltageMin));
   const [vmax, setVmax] = useLocalStorage('vmax', str(initModel?.acVoltageMax));
   const [invDate, setInvDate] = useLocalStorage('invDate', today());
+  const [customerMail, setCustomerMail] = useLocalStorage('customerMail', 'teszt@feak.hu');
 
   // A modell értékeit (nominal/min/max) automatikusan kitölti; a gyártóváltás az első modellt veszi.
   function applyModel(rec: DeviceModel | undefined) {
@@ -330,8 +381,24 @@ export default function App() {
   const realPods = useMemo(() => parsePods(podsText), [podsText]);
   const badPods = useMemo(() => realPods.filter((p) => p.length > 33), [realPods]);
 
+  // A generáláshoz kiválasztott feltöltött SZINKRON profil + a belőle nyert kulcs-sorok (POD/poc/mérlegkör).
+  const selectedSz = useMemo(() => savedSz.find((s) => s.id === selectedSzId) ?? null, [savedSz, selectedSzId]);
+  const szKeys = useMemo(() => (selectedSz ? szinkronKeyRows(selectedSz.rows) : []), [selectedSz]);
+  // A generáláshoz ténylegesen használt sorok: ha van kijelölés (selectedPods), csak azok; egyébként mind.
+  const szKeysSel = useMemo(() => {
+    const sel = selectedSz?.selectedPods;
+    return sel && sel.length ? szKeys.filter((k) => sel.includes(k.pod)) : szKeys;
+  }, [szKeys, selectedSz]);
+  // Vegyes-e a fájl (több DSO vagy több mérlegkör) – figyelmeztetéshez (de mind betöltjük).
+  const szMixed = useMemo(() => {
+    const dsoSet = new Set(szKeys.map((k) => k.pod.slice(0, 8)));
+    const mkSet = new Set(szKeys.map((k) => k.merlegkor).filter(Boolean));
+    return dsoSet.size > 1 || mkSet.size > 1;
+  }, [szKeys]);
+
   // A generálandó POD-ok száma (a választott mód szerint) és a becsült MAVIR adatpontok száma.
-  const podCount = podMode === 'auto' ? Math.max(0, parseInt(count, 10) || 0) : realPods.length;
+  const podCount = podMode === 'auto' ? Math.max(0, parseInt(count, 10) || 0)
+    : podMode === 'szinkron' ? szKeysSel.length : realPods.length;
   const mavirPoints = useMemo(() => {
     if (!meres || !from) return 0;
     const fromMs = new Date(from + 'T00:00:00').getTime();
@@ -352,17 +419,22 @@ export default function App() {
   // A feltöltés-ellenőrző lekérdezés a pgweb-hez (file-processor-db): az SFTP-s fájlok
   // (SZINKRON CSV + MAVIR XML) nevét dinamikusan az IN (...) listába teszi.
   const sftpNames = useMemo(
-    () => (files ?? []).filter((f) => f.target === 'sftp').map((f) => f.name),
+    () => (files ?? []).filter((f) => f.target === 'sftp' || f.target === 'msconst').map((f) => f.name),
     [files],
   );
   const checkQuery = useMemo(() => buildCheckQuery(sftpNames), [sftpNames]);
+  // Az inverter serialNumberök (a párosítás-fájlokból) – a mongo-express beküldés-ellenőrzéshez.
+  const invSerials = useMemo(
+    () => Array.from(new Set((files ?? []).map((f) => f.serial).filter((s): s is string => !!s))),
+    [files],
+  );
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
 
-  // Egyszeri normalizálás: a régi/elavult inverter-Swagger URL-t (congestMasterData vagy a téves _1)
-  // a helyes végpontra cseréli a tárolt beállításban – hogy ne kelljen kézzel javítani.
+  // Egyszeri normalizálás: a régi/elavult inverter-Swagger URL-t (congestMasterData vagy a _1 nélküli
+  // változat) a helyes végpontra (…receiveMasterDataFromManufacturer_1) cseréli – ne kelljen kézzel javítani.
   useEffect(() => {
-    if (/congestMasterData|receiveMasterDataFromManufacturer_1/.test(swaggerUrl)) setSwaggerUrl(DEFAULT_SWAGGER);
+    if (/congestMasterData/.test(swaggerUrl) || /receiveMasterDataFromManufacturer$/.test(swaggerUrl)) setSwaggerUrl(DEFAULT_SWAGGER);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -375,6 +447,8 @@ export default function App() {
     setError('');
     setUsedFiles(new Set()); // új generálás → tiszta „felhasználva" jelölők
     let pods: string[];
+    let pocs: string[] | undefined;     // importált SZINKRON: POD-onkénti FOGYHELY_AZON (a párosítás poc-ja)
+    let szMerlegkor: string | undefined; // importált SZINKRON: a fájl mérlegkör felelőse
     if (podMode === 'auto') {
       const n = parseInt(count, 10);
       if (!Number.isFinite(n) || n < 1) { setError('Adj meg egy pozitív POD-darabszámot.'); return; }
@@ -382,12 +456,20 @@ export default function App() {
       const body = randomPodBody();
       setPodBody(body);
       pods = generatePods(n, dso, body);
+    } else if (podMode === 'szinkron') {
+      if (!selectedSz) { setError('Válassz egy feltöltött SZINKRON profilt (a „Feltöltött SZINKRON” lapon tölthetsz fel és menthetsz).'); return; }
+      if (!szKeysSel.length) { setError('A kiválasztott SZINKRON nem tartalmaz (kijelölt) POD-ot.'); return; }
+      pods = szKeysSel.map((k) => k.pod);
+      pocs = szKeysSel.map((k) => k.poc || ''); // üres → a párosítás a számított poc-ra esik vissza
+      szMerlegkor = szKeysSel.find((k) => k.merlegkor)?.merlegkor;
     } else {
       if (!realPods.length) { setError('Illessz be legalább egy valódi POD-ot (soronként egyet).'); return; }
       pods = realPods;
     }
+    // Importált SZINKRON-nál a fájl mérlegkörét használjuk (ha van), különben a kiválasztottat.
+    const mkForGen = (podMode === 'szinkron' && szMerlegkor) ? szMerlegkor : merlegkor;
     if (!from) { setError('Válassz érvényes mérés-kezdő dátumot.'); return; }
-    if (!szinkron && !meres && !inverter && !invMeres) { setError('Pipálj ki legalább egy kimenetet.'); return; }
+    if (!szinkron && !meres && !inverter && !invMeres && !invPair && !msconst) { setError('Pipálj ki legalább egy kimenetet.'); return; }
     if (meres && mavirPoints > MAVIR_POINTS_CAP && !allowLarge) {
       setError(
         `Túl nagy MAVIR adatmennyiség: ~${mavirPoints.toLocaleString('hu-HU')} adatpont ` +
@@ -405,24 +487,34 @@ export default function App() {
       acVoltageMin: parseInt(vmin, 10) || 0,
       acVoltageMax: parseInt(vmax, 10) || 0,
       installationDate: invDate || today(),
+      customerMail: customerMail.trim(),
+    };
+    // A datetime-local 'YYYY-MM-DDTHH:mm' – ha nincs másodperc, kiegészítjük ':00'-val.
+    const msStartFull = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(msStart.trim()) ? `${msStart.trim()}:00` : msStart.trim();
+    const msconstSpec: MsconstSpec = {
+      channelName: msChannel, valueName: msValueName, valueUnit: msUnit, tFactor: msTFactor,
+      interval: msInterval, f2: msF2, startDateTime: msStartFull,
+      valueMin: parseFloat(msMin) || 0, valueMax: parseFloat(msMax) || 0,
     };
     const fromDate = new Date(from + 'T00:00:00');
     const genDateD = new Date((genDate || today()) + 'T00:00:00');
+    // Generálás indul → a konfig-kártyák automatikusan összecsukódnak, hogy az eredmények/lekérdezések látszódjanak.
+    setGenCol(true); setInvCol(true); setMsCol(true);
 
     // Nagy MAVIR + támogatott böngésző → közvetlenül LEMEZRE streameljük (nincs memória-összeomlás).
     const largeMavir = meres && mavirPoints > MAVIR_POINTS_CAP;
     const canStream = typeof (window as unknown as { showSaveFilePicker?: unknown }).showSaveFilePicker === 'function';
     if (largeMavir && canStream) {
-      await generateStreamed(pods, fromDate, genDateD, spec);
+      await generateStreamed(pods, fromDate, genDateD, spec, msconstSpec, pocs, mkForGen);
       return;
     }
 
     const myRun = ++runRef.current;
     setToast({ pct: 0, done: false });
     try {
-      const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres, inverter, invMeres, invPair }, spec, merlegkor, (frac) => {
+      const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres, inverter, invMeres, invPair, msconst }, spec, mkForGen, msconstSpec, (frac) => {
         if (runRef.current === myRun) setToast({ pct: Math.round(frac * 100), done: false });
-      });
+      }, pocs);
       if (runRef.current !== myRun) return; // időközben új generálás indult
       setFiles(res.files);
       setToast({ pct: 100, done: true });
@@ -434,11 +526,11 @@ export default function App() {
 
   // Nagy MAVIR: a böngésző egy save-dialógusban kéri a helyet, majd ~1 MB-os darabokban a LEMEZRE írja
   // (a memóriában mindig csak egy darab van), így tetszőleges méret sem szállítja el a fület.
-  async function generateStreamed(pods: string[], fromDate: Date, genDateD: Date, spec: InverterSpec) {
+  async function generateStreamed(pods: string[], fromDate: Date, genDateD: Date, spec: InverterSpec, msconstSpec: MsconstSpec, pocs: string[] | undefined, mkStream: string) {
     type Writable = { write: (s: string) => Promise<void>; close: () => Promise<void>; abort?: () => Promise<void> };
     const now = new Date();
     const { podsPerFile, parts } = mavirSplitPlan(pods.length, fromDate, now);
-    const names = mavirFileNames(pods, merlegkor, parts);
+    const names = mavirFileNames(pods, mkStream, parts);
 
     // >~1 GB → POD-onként több részfájl egy MAPPÁBA streamelve (memóriabiztos, egy dialógus).
     const dirPicker = (window as unknown as {
@@ -450,7 +542,7 @@ export default function App() {
       const myRun = ++runRef.current;
       setToast({ pct: 0, done: false });
       try {
-        const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres: false, inverter, invMeres, invPair }, spec, merlegkor);
+        const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres: false, inverter, invMeres, invPair, msconst }, spec, mkStream, msconstSpec, undefined, pocs);
         const sums: number[] = new Array(pods.length).fill(0);
         const partInfos: GeneratedFile[] = [];
         for (let pi = 0; pi < parts; pi++) {
@@ -508,7 +600,7 @@ export default function App() {
     setToast({ pct: 0, done: false });
     try {
       // SZINKRON + inverter (gyors, memóriában) – MAVIR nélkül; a MAVIR-t streameljük.
-      const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres: false, inverter, invMeres, invPair }, spec, merlegkor);
+      const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres: false, inverter, invMeres, invPair, msconst }, spec, mkStream, msconstSpec, undefined, pocs);
       const sums: number[] = new Array(pods.length).fill(0);
       for await (const chunk of mavirXmlChunks(pods, fromDate, now, now, (frac) => {
         if (runRef.current === myRun) setToast({ pct: Math.round(frac * 100), done: false });
@@ -545,9 +637,59 @@ export default function App() {
       : t === 'measurement' ? swaggerMeasUrl
       : t === 'rabbit' ? rabbitUrl
       : sftpUrl;
+  // mongo-express ellenőrző URL egy inverter serialNumberre (a beküldés sikere a Messages-ben).
+  // sort[ReceivedAt]=-1 → a legfrissebb beküldés elöl; a value az adott POD inverterének serialNumbere (dinamikus).
+  const mongoVerifyUrl = (serial: string) =>
+    `${mongoUrl}?sort%5BReceivedAt%5D=-1&key=Raw.podContracts.devices.serialNumber&value=${encodeURIComponent(serial)}&type=S`;
+
+  // SZINKRON fájl beolvasása → új mentett profil (a nyers fájlt NEM tároljuk, csak a parsolt adatokat cache-eljük).
+  async function onSzinkronFile(file: File | null | undefined) {
+    if (!file) return;
+    try {
+      const parsed = parseSzinkron(await file.text());
+      if (!parsed.rows.length) { setError('A SZINKRON fájl nem tartalmaz adatsort.'); return; }
+      const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const prof: SavedSzinkron = {
+        id, name: file.name.replace(/\.[^.]+$/, '') || 'SZINKRON', createdAt: new Date().toISOString(),
+        columns: parsed.columns, rows: parsed.rows,
+      };
+      setSavedSz((list) => [prof, ...list]);
+      setEditSzId(id);
+      setError('');
+    } catch {
+      setError('A SZINKRON fájl beolvasása nem sikerült.');
+    }
+  }
+  const updateSzCell = (id: string, rowIdx: number, col: string, value: string) =>
+    setSavedSz((list) => list.map((s) => (s.id === id ? { ...s, rows: s.rows.map((r, i) => (i === rowIdx ? { ...r, [col]: value } : r)) } : s)));
+  const renameSz = (id: string, name: string) => setSavedSz((list) => list.map((s) => (s.id === id ? { ...s, name } : s)));
+  // Egy sor törlése (a kijelölésből is kivesszük az adott POD-ot).
+  const deleteSzRow = (id: string, rowIdx: number) =>
+    setSavedSz((list) => list.map((s) => {
+      if (s.id !== id) return s;
+      const pod = s.rows[rowIdx]?.['POD'];
+      return { ...s, rows: s.rows.filter((_, i) => i !== rowIdx), selectedPods: (s.selectedPods ?? []).filter((p) => p !== pod) };
+    }));
+  // Egy sor (POD) kijelölésének váltása a generáláshoz.
+  const toggleSzRowSel = (id: string, pod: string) =>
+    setSavedSz((list) => list.map((s) => {
+      if (s.id !== id) return s;
+      const cur = s.selectedPods ?? [];
+      return { ...s, selectedPods: cur.includes(pod) ? cur.filter((p) => p !== pod) : [...cur, pod] };
+    }));
+  // Összes sor ki-/bejelölése.
+  const setSzAllSel = (id: string, all: boolean) =>
+    setSavedSz((list) => list.map((s) => (s.id === id ? { ...s, selectedPods: all ? s.rows.map((r) => r['POD']).filter(Boolean) : [] } : s)));
+  const deleteSz = (id: string) => {
+    setSavedSz((list) => list.filter((s) => s.id !== id));
+    if (editSzId === id) setEditSzId('');
+    if (selectedSzId === id) setSelectedSzId('');
+  };
+  const editSz = savedSz.find((s) => s.id === editSzId) ?? null;
 
   const nav: { id: View; icon: IconName; label: string }[] = [
     { id: 'generate', icon: 'zap', label: 'Generálás' },
+    { id: 'szinkron', icon: 'database', label: 'Feltöltött SZINKRON' },
     { id: 'settings', icon: 'settings', label: 'Beállítások' },
     { id: 'about', icon: 'info', label: 'Névjegy' },
   ];
@@ -559,10 +701,8 @@ export default function App() {
           dotRadius={1.5}
           dotSpacing={14}
           bulgeStrength={67}
-          glowRadius={160}
           sparkle={false}
           waveAmplitude={0}
-          glowColor={theme === 'dark' ? 'rgba(99, 102, 241, 0.20)' : 'rgba(99, 102, 241, 0.12)'}
         />
       </div>
 
@@ -614,8 +754,7 @@ export default function App() {
 
               <div className="gen-layout">
                 <div className="gen-left">
-              <section className="card">
-                <h2>Mit generáljunk?</h2>
+              <CollapsibleCard title="Mit generáljunk?" collapsed={genCol} onToggle={() => setGenCol((v) => !v)}>
                 <p className="desc">
                   Válaszd ki a POD-forrást: a generátor <b>automatikusan</b> előállítja a POD-okat (az ENAP-doksi
                   szerinti formátumban: <code>HU000&lt;DSO&gt; + törzs + sorszám</code>), vagy beilleszthetsz
@@ -629,6 +768,9 @@ export default function App() {
                   </button>
                   <button className={podMode === 'paste' ? 'active' : ''} onClick={() => setPodMode('paste')}>
                     Valódi POD-ok beillesztése
+                  </button>
+                  <button className={podMode === 'szinkron' ? 'active' : ''} onClick={() => setPodMode('szinkron')}>
+                    Feltöltött SZINKRON
                   </button>
                 </div>
 
@@ -670,9 +812,35 @@ export default function App() {
                     <p className="hint">
                       Minta POD (1.): <code>{examplePodTemplate(dso, podBody)}</code> — a törzs után a sorszám
                       nullával <b>33 karakterre</b> töltve. A törzs <b>minden generáláskor</b> (és oldalbetöltéskor)
-                      új véletlen érték — a 🔀 gombbal előre is pörgethetsz egyet —, így sosem generálsz kétszer
+                      új véletlen érték. a 🔀 gombbal előre is pörgethetsz egyet —, így sosem generálsz kétszer
                       ugyanolyan POD-ot.
                     </p>
+                  </>
+                ) : podMode === 'szinkron' ? (
+                  <>
+                    <label className="full">
+                      <span>Feltöltött SZINKRON profil</span>
+                      <select value={selectedSzId} onChange={(e) => setSelectedSzId(e.target.value)}>
+                        <option value="">— válassz —</option>
+                        {savedSz.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name} ({szinkronKeyRows(s.rows).length} POD)</option>
+                        ))}
+                      </select>
+                    </label>
+                    {selectedSz ? (
+                      <p className="hint">
+                        <b>{szKeysSel.length}</b> POD a(z) <b>{selectedSz.name}</b> profilból
+                        {selectedSz.selectedPods?.length ? <> ({szKeys.length}-ből kijelölve)</> : <> (mind)</>}. A párosítás
+                        <b> poc</b>-ja a fájl <code>[FOGYHELY_AZON]</code>-ja, a mérlegkör is a fájlból jön. A kijelölést a
+                        <b> „Feltöltött SZINKRON"</b> lapon, a szerkesztőben állíthatod.
+                        {szMixed && <> ⚠ A fájl <b>többféle DSO-t/mérlegkört</b> tartalmaz – mind betöltjük.</>}
+                      </p>
+                    ) : (
+                      <p className="hint">
+                        Nincs kiválasztva profil. A <b>Feltöltött SZINKRON</b> lapon tölts fel egy SZINKRON CSV-t,
+                        szerkeszd és mentsd – itt utána kiválaszthatod.
+                      </p>
+                    )}
                   </>
                 ) : (
                   <>
@@ -737,10 +905,13 @@ export default function App() {
 
                 <div className="checks">
                   <label className="check"><input type="checkbox" checked={szinkron} onChange={(e) => setSzinkron(e.target.checked)} /> <span>SZINKRON törzsadat (CSV) → SFTP</span></label>
-                  <label className="check"><input type="checkbox" checked={meres} onChange={(e) => setMeres(e.target.checked)} /> <span>MAVIR mérés (XML) → SFTP</span></label>
-                  <label className="check"><input type="checkbox" checked={inverter} onChange={(e) => setInverter(e.target.checked)} /> <span>Inverter gyártói törzsadat (JSON) → Swagger (receiveMasterDataFromManufacturer)</span></label>
-                  <label className="check"><input type="checkbox" checked={invPair} onChange={(e) => setInvPair(e.target.checked)} /> <span>Inverter párosítás (JSON) → RabbitMQ (pod-registry.inverter-pod-data)</span></label>
-                  <label className="check"><input type="checkbox" checked={invMeres} onChange={(e) => setInvMeres(e.target.checked)} /> <span>Inverter mérésadat (JSON) → Swagger (v1.2) — párosítás-ellenőrzés</span></label>
+                  <div className="check-row">
+                    <label className="check"><input type="checkbox" checked={meres} onChange={(e) => setMeres(e.target.checked)} /> <span>MAVIR mérés (XML) → SFTP</span></label>
+                    <label className="check"><input type="checkbox" checked={msconst} onChange={(e) => setMsconst(e.target.checked)} /> <span>MSCONST → SFTP</span></label>
+                  </div>
+                  <label className="check"><input type="checkbox" checked={inverter} onChange={(e) => setInverter(e.target.checked)} /> <span>Inverter gyártói törzsadat (JSON) → Swagger</span></label>
+                  <label className="check"><input type="checkbox" checked={invPair} onChange={(e) => setInvPair(e.target.checked)} /> <span>Inverter párosítás (JSON) → RabbitMQ</span></label>
+                  <label className="check"><input type="checkbox" checked={invMeres} onChange={(e) => setInvMeres(e.target.checked)} /> <span>Inverter mérésadat (JSON) → Swagger</span></label>
                 </div>
                 {invPair && (
                   <p className="hint">
@@ -773,12 +944,11 @@ export default function App() {
                 )}
 
                 {error && <p className="error">{error}</p>}
-                <button className="primary" onClick={onGenerate}>Generálás</button>
-              </section>
+                {!(inverter || invMeres) && !msconst && <button className="primary" onClick={onGenerate}>Generálás</button>}
+              </CollapsibleCard>
 
               {(inverter || invMeres) && (
-                <section className="card">
-                  <h2>Inverter gyártói adatok</h2>
+                <CollapsibleCard title="Inverter gyártói adatok" collapsed={invCol} onToggle={() => setInvCol((v) => !v)}>
                   <p className="desc">
                     A pod-registry-db DeviceTypes táblából. Válassz gyártót, majd a hozzá tartozó modellek közül – a
                     nominalPower / acVoltageMin / acVoltageMax a modell alapján automatikusan kitöltődik (felülírható).
@@ -801,8 +971,31 @@ export default function App() {
                     <label><span>nominalPower</span><input type="number" value={power} onChange={(e) => setPower(e.target.value)} /></label>
                     <label><span>acVoltageMin</span><input type="number" value={vmin} onChange={(e) => setVmin(e.target.value)} /></label>
                     <label><span>acVoltageMax</span><input type="number" value={vmax} onChange={(e) => setVmax(e.target.value)} /></label>
+                    <label><span>Ügyfél e-mail (customerMail)</span><input type="email" value={customerMail} placeholder="pl. teszt@feak.hu" onChange={(e) => setCustomerMail(e.target.value)} /></label>
+                    <div className="gen-cell"><button className="primary" onClick={onGenerate}>Generálás</button></div>
                   </div>
-                </section>
+                </CollapsibleCard>
+              )}
+
+              {msconst && (
+                <CollapsibleCard title="MSCONST mezők" collapsed={msCol} onToggle={() => setMsCol((v) => !v)}>
+                  <p className="desc">
+                    MAVIR <code>EDW_XML</code>, de NEM idősor: POD-onként egy konstans érték (egy <code>&lt;BLOCK&gt;</code>/egy <code>&lt;E&gt;</code>).
+                    A <b>LOC-KEY a generált POD</b>, a <b>V</b> érték véletlen a tartományból; a többi mező a mintából, szerkeszthető.
+                  </p>
+                  <div className="grid3">
+                    <label><span>CHANNEL-NAME</span><input value={msChannel} onChange={(e) => setMsChannel(e.target.value)} /></label>
+                    <label><span>VALUE-NAME</span><input value={msValueName} onChange={(e) => setMsValueName(e.target.value)} /></label>
+                    <label><span>VALUE-UNIT</span><input value={msUnit} onChange={(e) => setMsUnit(e.target.value)} /></label>
+                    <label><span>T-FACTOR</span><input value={msTFactor} onChange={(e) => setMsTFactor(e.target.value)} /></label>
+                    <label><span>INTERVAL</span><input value={msInterval} placeholder="00:05:00" onChange={(e) => setMsInterval(e.target.value)} /></label>
+                    <label><span>F2</span><input value={msF2} onChange={(e) => setMsF2(e.target.value)} /></label>
+                    <label><span>START-DATETIME</span><input type="datetime-local" step={1} value={msStart} onChange={(e) => setMsStart(e.target.value)} /></label>
+                    <label><span>Érték min (V)</span><input type="number" value={msMin} onChange={(e) => setMsMin(e.target.value)} /></label>
+                    <label><span>Érték max (V)</span><input type="number" value={msMax} onChange={(e) => setMsMax(e.target.value)} /></label>
+                    {!(inverter || invMeres) && <div className="gen-cell"><button className="primary" onClick={onGenerate}>Generálás</button></div>}
+                  </div>
+                </CollapsibleCard>
               )}
 
               {sftpNames.length > 0 && (
@@ -831,6 +1024,36 @@ export default function App() {
                         Futtasd a <b>public.file_metadata</b> táblán. <code>file_processed_status</code> = <b>DONE</b> → sikeres.
                       </p>
                     </>
+                  )}
+                </section>
+              )}
+
+              {invSerials.length > 0 && (
+                <section className="card side-panel">
+                  <div className="panel-head">
+                    <button className="panel-toggle" onClick={() => setMongoOpen((v) => !v)} aria-expanded={mongoOpen}>
+                      <Icon name="database" size={15} />
+                      <span className="panel-title-text">Inverter ellenőrzése — mongo-express (<b>pod-registry-db</b>)</span>
+                    </button>
+                    <div className="head-actions">
+                      <button className="ghost sm panel-chevron" onClick={() => setMongoOpen((v) => !v)} aria-label={mongoOpen ? 'Összecsukás' : 'Kinyitás'}>
+                        <Icon name={mongoOpen ? 'chevron-down' : 'chevron-right'} size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  {mongoOpen && (
+                    <div className="panel-body">
+                      <p className="hint" style={{ marginTop: 0 }}>
+                        Beküldés után serialNumberenként ellenőrizd, hogy bekerült-e a <b>Messages</b>-be:
+                      </p>
+                      <div className="mongo-list">
+                        {invSerials.map((s) => (
+                          <a key={s} className="ghost sm mongo-item" href={mongoVerifyUrl(s)} target="_blank" rel="noreferrer" title="Megnyitás a mongo-express-ben">
+                            <Icon name="external" size={14} /> <span className="mongo-serial">{s}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </section>
               )}
@@ -917,6 +1140,9 @@ export default function App() {
                                     {f.target !== 'report' && (
                                       <a className="ghost sm" href={targetUrl(f.target)} target="_blank" rel="noreferrer"><Icon name="external" size={15} /> {targetLabel(f.target)}</a>
                                     )}
+                                    {f.serial && (
+                                      <a className="ghost sm" href={mongoVerifyUrl(f.serial)} target="_blank" rel="noreferrer" title="A beküldés ellenőrzése a pod-registry-db Messages-ben"><Icon name="database" size={15} /> mongo ellenőrzés</a>
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -938,6 +1164,113 @@ export default function App() {
             </>
           )}
 
+          {view === 'szinkron' && (
+            <>
+              <header className="page-head">
+                <h1>Feltöltött SZINKRON adatok</h1>
+                <p>Húzz be vagy tölts fel egy SZINKRON CSV-t. A mezők szerkeszthetők; minden a böngésző cache-ében marad (nincs adatbázis), és reload után is megmarad. A Generálás fülön kiválaszthatod, melyiket használd.</p>
+              </header>
+
+              <section className="card">
+                <h2>Új feltöltés</h2>
+                <p className="desc">Húzd ide a SZINKRON fájlt, vagy válaszd ki. A <b>nyers fájlt nem tároljuk</b>, csak a kiolvasott adatokat.</p>
+                <div
+                  className="drop-zone"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); onSzinkronFile(e.dataTransfer.files?.[0]); }}
+                >
+                  <Icon name="download" size={22} />
+                  <span>Húzd ide a SZINKRON CSV-t</span>
+                  <label className="ghost sm file-pick">
+                    Fájl kiválasztása
+                    <input type="file" accept=".csv,.txt,text/csv,text/plain" style={{ display: 'none' }} onChange={(e) => { onSzinkronFile(e.target.files?.[0]); e.currentTarget.value = ''; }} />
+                  </label>
+                </div>
+                {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
+              </section>
+
+              <section className="card">
+                <h2>Mentett SZINKRON-ok ({savedSz.length})</h2>
+                {savedSz.length === 0 ? (
+                  <p className="desc">Még nincs feltöltés.</p>
+                ) : (
+                  <div className="sz-list">
+                    {savedSz.map((s) => (
+                      <div className={`sz-item${editSzId === s.id ? ' active' : ''}`} key={s.id}>
+                        <div className="sz-item-info">
+                          <div className="sz-item-name">{s.name}</div>
+                          <div className="sz-item-meta">{szinkronKeyRows(s.rows).length} POD · {s.rows.length} sor{selectedSzId === s.id ? ' · generáláshoz kiválasztva' : ''}</div>
+                        </div>
+                        <div className="head-actions">
+                          <button className="ghost sm" onClick={() => setEditSzId(editSzId === s.id ? '' : s.id)}>{editSzId === s.id ? <><Icon name="x" size={15} /> Bezárás</> : <><Icon name="pencil" size={15} /> Szerkesztés</>}</button>
+                          <button className="ghost sm" onClick={() => { setSelectedSzId(s.id); setPodMode('szinkron'); setView('generate'); }}><Icon name="zap" size={15} /> Generáláshoz</button>
+                          <button className="ghost sm" onClick={() => deleteSz(s.id)}><Icon name="trash" size={15} /> Törlés</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {editSz && (
+                <section className="card">
+                  <div className="card-head">
+                    <h2>Szerkesztés — {editSz.name}</h2>
+                    <div className="head-actions">
+                      <button className="primary sm" onClick={() => setEditSzId('')}><Icon name="check" size={15} /> Kész</button>
+                    </div>
+                  </div>
+                  <label className="full"><span>Profil neve</span><input value={editSz.name} onChange={(e) => renameSz(editSz.id, e.target.value)} /></label>
+                  <p className="hint" style={{ marginTop: 10 }}>
+                    Minden mező szerkeszthető; a változások azonnal mentődnek a böngésző cache-ébe. A generáláshoz a
+                    <code> POD</code>, <code>FOGYHELY_AZON</code> (poc) és <code>Merlegkor_Felelos</code> oszlopok a fontosak.
+                    A <b>☑ jelöléssel</b> kiválaszthatod, mely sorokhoz (POD-okhoz) generáljon mérésadatot/invertert
+                    (<b>üres jelölés = mind</b>); a <Icon name="trash" size={12} /> gombbal sort törölhetsz.
+                    {(editSz.selectedPods?.length ?? 0) > 0 && <> Jelenleg <b>{editSz.selectedPods!.length}</b> sor kijelölve.</>}
+                  </p>
+                  <div className="sz-table-wrap pretty-scroll">
+                    <table className="sz-table">
+                      <thead>
+                        <tr>
+                          <th className="sz-selcol">
+                            <input
+                              type="checkbox"
+                              title="Összes ki-/bejelölése"
+                              checked={editSz.rows.length > 0 && editSz.rows.every((r) => (editSz.selectedPods ?? []).includes(r['POD']))}
+                              onChange={(e) => setSzAllSel(editSz.id, e.target.checked)}
+                            />
+                          </th>
+                          <th>#</th>
+                          <th className="sz-delcol"></th>
+                          {editSz.columns.map((c) => <th key={c}>{c}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editSz.rows.map((r, ri) => {
+                          const sel = (editSz.selectedPods ?? []).includes(r['POD']);
+                          return (
+                            <tr key={ri} className={sel ? 'sz-row-sel' : ''}>
+                              <td className="sz-selcol">
+                                <input type="checkbox" checked={sel} disabled={!r['POD']} onChange={() => toggleSzRowSel(editSz.id, r['POD'])} title={r['POD'] ? r['POD'] : 'nincs POD ebben a sorban'} />
+                              </td>
+                              <td className="sz-rownum">{ri + 1}</td>
+                              <td className="sz-delcol">
+                                <button className="sz-del-btn" title="Sor törlése" onClick={() => deleteSzRow(editSz.id, ri)}><Icon name="trash" size={14} /></button>
+                              </td>
+                              {editSz.columns.map((c) => (
+                                <td key={c}><input value={r[c] ?? ''} onChange={(e) => updateSzCell(editSz.id, ri, c, e.target.value)} /></td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+
           {view === 'settings' && (
             <>
               <header className="page-head">
@@ -956,6 +1289,7 @@ export default function App() {
                 <label className="full" style={{ marginTop: 12 }}><span>Swagger UI — inverter gyártói törzsadat (receiveMasterDataFromManufacturer)</span><input value={swaggerUrl} onChange={(e) => setSwaggerUrl(e.target.value)} /></label>
                 <label className="full" style={{ marginTop: 12 }}><span>Swagger UI — inverter mérésadat (v1.2 measurement)</span><input value={swaggerMeasUrl} onChange={(e) => setSwaggerMeasUrl(e.target.value)} /></label>
                 <label className="full" style={{ marginTop: 12 }}><span>RabbitMQ Management — inverter párosítás (pod-registry.inverter-pod-data)</span><input value={rabbitUrl} onChange={(e) => setRabbitUrl(e.target.value)} /></label>
+                <label className="full" style={{ marginTop: 12 }}><span>mongo-express — beküldés-ellenőrzés (pod-registry-db Messages)</span><input value={mongoUrl} onChange={(e) => setMongoUrl(e.target.value)} /></label>
               </section>
             </>
           )}
