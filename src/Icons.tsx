@@ -17,7 +17,8 @@ export type IconName =
   | 'chevron-left'
   | 'chevron-right'
   | 'chevron-down'
-  | 'grip';
+  | 'grip'
+  | 'shuffle';
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const c = {
@@ -153,6 +154,16 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
           <circle cx="15" cy="12" r="1.5" />
           <circle cx="9" cy="18" r="1.5" />
           <circle cx="15" cy="18" r="1.5" />
+        </svg>
+      );
+    case 'shuffle':
+      return (
+        <svg {...c}>
+          <path d="M16 3h5v5" />
+          <path d="M4 20 21 3" />
+          <path d="M21 16v5h-5" />
+          <path d="M15 15l6 6" />
+          <path d="M4 4l5 5" />
         </svg>
       );
   }
