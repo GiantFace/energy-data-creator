@@ -71,7 +71,10 @@ export type GeneratedFile = {
 
 export type BundleResult = { pods: number; points: number; invDevices: number; files: GeneratedFile[] };
 
-const TRADER = 'SYNTH-TEST';
+// Kereskedő (a [Kereskedo] mező + a fájlnév trader-része) – a kért ELMŰ 210 – TEST-FEAK
+// DSO-kereskedő teszt-pár. (Korábban 'SYNTH-TEST'.)
+const TRADER = 'TEST-FEAK';
+// Mérlegkör-felelős fallback EIC; a SZINKRON-ban a kiválasztott BALANCE_RESPONSIBLES (merlegkor) felülírja.
 const BALANCE_EIC = '15X-SINERGY----D';
 const MEAS_OBIS = '1.29.99.128';
 
@@ -90,7 +93,6 @@ export const BALANCE_RESPONSIBLES: BalanceResponsible[] = [
   { eic: 'MULTI_01', name: 'MULTI_01 – Tinmar Kft.' },
   { eic: 'MULTI_03', name: 'MULTI_03 – Tinmar Kft.' },
   { eic: 'MULTI_02', name: 'MULTI_02 – Tinmar Kft.' },
-  { eic: 'TEST-FEAK1', name: 'FEAK TEST1 Zrt' },
   { eic: 'OTTI-FEAK1', name: 'OTTI TEST1 Zrt' },
   { eic: "HARVEY'S PARTNER", name: "HARVEY'S PARTNER DDK" },
   { eic: '15X-PGP-TSL1---6', name: 'PAKS TESZT' },

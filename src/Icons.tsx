@@ -20,6 +20,7 @@ export type IconName =
   | 'grip'
   | 'shuffle'
   | 'pencil'
+  | 'terminal'
   | 'x';
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
@@ -180,6 +181,13 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <svg {...c}>
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      );
+    case 'terminal':
+      return (
+        <svg {...c}>
+          <polyline points="4 17 10 11 4 5" />
+          <line x1="12" y1="19" x2="20" y2="19" />
         </svg>
       );
   }

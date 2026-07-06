@@ -32,7 +32,26 @@ const DEFAULT_SWAGGER =
 // Inverter MÉRÉSADAT (v1.2 inverter-controller) – külön a párosítás (master-data) végpontjától.
 const DEFAULT_SWAGGER_MEAS =
   'https://device-data-receiver.uat.enap.oci/swagger/swagger-ui/index.html#/inverter-controller/receiveMeasurementData_3';
+// A v1.2 inverter mérésadat TÉNYLEGES API-végpontja (a cert-alapú POST-hoz, nem a Swagger UI-hoz).
+const API_MEAS_URL = 'https://device-data-receiver.uat.enap.oci/api/v1.2/inverter/measurement-data';
+const DEFAULT_CERT_CN = 'feak-uat'; // a kliens-tanúsítvány CN-je (Cert:\CurrentUser\My) – Beállításokban átírható
 const PGWEB_URL = 'https://pgweb-ui.uat.enap.oci/#';
+
+// Kész PowerShell parancs a cert-alapú POST-hoz (a Swagger UI nem tud kliens-tanúsítványt csatolni).
+// A fájlt a Downloads mappából olvassa (`-Raw`!); a válasz 200 = párosítva, 202 = „Missing device data".
+function buildPsCommand(fileName: string, url: string, certCn: string): string {
+  return [
+    `$cert = Get-ChildItem Cert:\\CurrentUser\\My | Where-Object { $_.Subject.Contains("CN=${certCn}") -and $_.NotAfter -gt (Get-Date) } | Select-Object -First 1`,
+    `$file = "$env:USERPROFILE\\Downloads\\${fileName}"   # ha máshova töltötted, írd át`,
+    `try {`,
+    `  $res = Invoke-WebRequest -UseBasicParsing -Uri "${url}" -Certificate $cert -Method Post -Body (Get-Content $file -Raw) -ContentType "application/json"`,
+    `  "Status: $($res.StatusCode)"; $res.Content   # 200 = parositva | 202 = Missing device data`,
+    `} catch {`,
+    `  $r = $_.Exception.Response`,
+    `  if ($r) { "HTTP $([int]$r.StatusCode)"; (New-Object IO.StreamReader($r.GetResponseStream())).ReadToEnd() } else { $_ }`,
+    `}`,
+  ].join('\n');
+}
 // RabbitMQ Management UI – ide kell publikálni az inverter-párosítást (pod-registry.inverter-pod-data).
 const DEFAULT_RABBIT = 'https://rabbitmq-ui.uat.enap.oci/#/exchanges';
 // mongo-express (pod-registry-db Messages) – az inverter beküldés sikere a serialNumber alapján.
@@ -266,6 +285,7 @@ export default function App() {
   const [sftpUrl, setSftpUrl] = useCookie('sftpUrl', DEFAULT_SFTP);
   const [swaggerUrl, setSwaggerUrl] = useCookie('swaggerUrl', DEFAULT_SWAGGER);
   const [swaggerMeasUrl, setSwaggerMeasUrl] = useCookie('swaggerMeasUrl', DEFAULT_SWAGGER_MEAS);
+  const [certName, setCertName] = useCookie('certName', DEFAULT_CERT_CN);
   const [rabbitUrl, setRabbitUrl] = useCookie('rabbitUrl', DEFAULT_RABBIT);
   const [mongoUrl, setMongoUrl] = useCookie('mongoUrl', DEFAULT_MONGO);
 
@@ -1137,6 +1157,17 @@ export default function App() {
                                         )}
                                       </>
                                     )}
+                                    {f.target === 'measurement' && (
+                                      <button
+                                        className="ghost sm"
+                                        title="Kész PowerShell parancs (cert-alapú POST a v1.2 mérés-végpontra) másolása"
+                                        onClick={() => { copyText(buildPsCommand(f.name, API_MEAS_URL, certName), `ps:${f.name}`); markUsed(f.name); }}
+                                      >
+                                        {copied === `ps:${f.name}`
+                                          ? <><Icon name="check" size={15} /> PS másolva</>
+                                          : <><Icon name="terminal" size={15} /> PS parancs</>}
+                                      </button>
+                                    )}
                                     {f.target !== 'report' && (
                                       <a className="ghost sm" href={targetUrl(f.target)} target="_blank" rel="noreferrer"><Icon name="external" size={15} /> {targetLabel(f.target)}</a>
                                     )}
@@ -1288,6 +1319,7 @@ export default function App() {
                 <label className="full"><span>SFTP web kliens (SZINKRON / MAVIR)</span><input value={sftpUrl} onChange={(e) => setSftpUrl(e.target.value)} /></label>
                 <label className="full" style={{ marginTop: 12 }}><span>Swagger UI — inverter gyártói törzsadat (receiveMasterDataFromManufacturer)</span><input value={swaggerUrl} onChange={(e) => setSwaggerUrl(e.target.value)} /></label>
                 <label className="full" style={{ marginTop: 12 }}><span>Swagger UI — inverter mérésadat (v1.2 measurement)</span><input value={swaggerMeasUrl} onChange={(e) => setSwaggerMeasUrl(e.target.value)} /></label>
+                <label className="full" style={{ marginTop: 12 }}><span>Kliens-tanúsítvány CN (PS parancs · Cert:\CurrentUser\My)</span><input value={certName} onChange={(e) => setCertName(e.target.value)} placeholder="feak-uat" /></label>
                 <label className="full" style={{ marginTop: 12 }}><span>RabbitMQ Management — inverter párosítás (pod-registry.inverter-pod-data)</span><input value={rabbitUrl} onChange={(e) => setRabbitUrl(e.target.value)} /></label>
                 <label className="full" style={{ marginTop: 12 }}><span>mongo-express — beküldés-ellenőrzés (pod-registry-db Messages)</span><input value={mongoUrl} onChange={(e) => setMongoUrl(e.target.value)} /></label>
               </section>
