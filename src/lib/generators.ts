@@ -76,9 +76,14 @@ export type BundleResult = { pods: number; points: number; invDevices: number; f
 const TRADER = 'TEST-FEAK';
 // Mérlegkör-felelős fallback EIC; a SZINKRON-ban a kiválasztott BALANCE_RESPONSIBLES (merlegkor) felülírja.
 const BALANCE_EIC = '15X-SINERGY----D';
-const MEAS_OBIS = '1.29.99.128';        // A+ (vételezés/fogyasztás) load-profil OBIS
-const MEAS_OBIS_PROD = '2.29.99.128';   // A- (betáplálás/termelés) OBIS – a +A OBIS -A megfelelője
-export type MavirChannel = 'A+' | 'A-';
+// A MAVIR terhelési-görbe csatornák (DataChannelTypes registry, 15 perc): CHANNEL-NAME → OBIS + egység.
+export type MavirChannel = 'A+' | 'A-' | 'R+' | 'R-';
+const MAVIR_CHANNELS: Record<MavirChannel, { obis: string; unit: string }> = {
+  'A+': { obis: '1.29.99.128', unit: 'kwh' },   // hatásos energia fogyasztás (vételezés)
+  'A-': { obis: '2.29.99.128', unit: 'kwh' },   // hatásos energia visszatáplálás (termelés)
+  'R+': { obis: '3.29.99.128', unit: 'kVArh' }, // import meddő energia
+  'R-': { obis: '4.29.99.128', unit: 'kVArh' }, // export meddő energia
+};
 
 // Mérlegkör felelősök a pod-registry-db-ből. Az `eic` kerül a [Merlegkor_Felelos] mezőbe ÉS
 // (fájlnév-biztosan) a SZINKRON fájlnév partner-mezőjébe – valódi, regisztrált értékkel.
@@ -255,14 +260,14 @@ export async function* mavirXmlChunks(
   let lastTick = Date.now();
   for (let i = 0; i < pods.length; i++) {
     const p = pods[i];
-    // POD-onként minden kért csatorna külön <DATA> blokk (A+ és/vagy A-). Az összesítő (sums) az első csatorna.
+    // POD-onként minden kért csatorna külön <DATA> blokk (A+/A-/R+/R-). Az összesítő (sums) az első csatorna.
     for (const channel of channels) {
-      const obis = channel === 'A-' ? MEAS_OBIS_PROD : MEAS_OBIS;
+      const { obis, unit } = MAVIR_CHANNELS[channel];
       buf += '    <DATA>\r\n';
       buf += `        <LOC-KEY>${p}</LOC-KEY>\r\n`;
       buf += `        <CHANNEL-NAME>${channel}</CHANNEL-NAME>\r\n`;
       buf += `        <VALUE-NAME>${obis}</VALUE-NAME>\r\n`;
-      buf += '        <VALUE-UNIT>kwh</VALUE-UNIT>\r\n        <T-FACTOR>1</T-FACTOR>\r\n        <INTERVAL>00:15:00</INTERVAL>\r\n';
+      buf += `        <VALUE-UNIT>${unit}</VALUE-UNIT>\r\n        <T-FACTOR>1</T-FACTOR>\r\n        <INTERVAL>00:15:00</INTERVAL>\r\n`;
       buf += '        <BLOCK>\r\n';
       buf += `            <START-DATETIME>${isoLocal(from)}</START-DATETIME>\r\n`;
       for (let t = from.getTime(); t < end.getTime(); t += stepMs) {
@@ -401,12 +406,12 @@ function buildMavirParts(
     '    <HEADER>\r\n        <VERSION>1.0</VERSION>\r\n        <GENERATOR>WM_XML_Generator</GENERATOR>\r\n' +
     `        <GENERATED-DATETIME>${isoLocal(generated)}</GENERATED-DATETIME>\r\n    </HEADER>\r\n`;
   const footer = '</EDW_XML>';
-  const dataHead = (p: string, ch: MavirChannel, obis: string, startMs: number) =>
+  const dataHead = (p: string, ch: MavirChannel, obis: string, unit: string, startMs: number) =>
     '    <DATA>\r\n' +
     `        <LOC-KEY>${p}</LOC-KEY>\r\n` +
     `        <CHANNEL-NAME>${ch}</CHANNEL-NAME>\r\n` +
     `        <VALUE-NAME>${obis}</VALUE-NAME>\r\n` +
-    '        <VALUE-UNIT>kwh</VALUE-UNIT>\r\n        <T-FACTOR>1</T-FACTOR>\r\n        <INTERVAL>00:15:00</INTERVAL>\r\n' +
+    `        <VALUE-UNIT>${unit}</VALUE-UNIT>\r\n        <T-FACTOR>1</T-FACTOR>\r\n        <INTERVAL>00:15:00</INTERVAL>\r\n` +
     '        <BLOCK>\r\n' +
     `            <START-DATETIME>${isoLocal(new Date(startMs))}</START-DATETIME>\r\n`;
   const dataFoot = '        </BLOCK>\r\n    </DATA>\r\n';
@@ -423,10 +428,10 @@ function buildMavirParts(
   for (let i = 0; i < pods.length; i++) {
     const p = pods[i];
     for (const ch of channels) {
-      const obis = ch === 'A-' ? MEAS_OBIS_PROD : MEAS_OBIS;
+      const { obis, unit } = MAVIR_CHANNELS[ch];
       let blockOpen = false;
       for (let t = from.getTime(); t < end.getTime(); t += stepMs) {
-        if (!blockOpen) { buf += dataHead(p, ch, obis, t); blockOpen = true; }
+        if (!blockOpen) { buf += dataHead(p, ch, obis, unit, t); blockOpen = true; }
         const v = (100 + Math.random() * 1400).toFixed(2);
         if (sums && ch === channels[0]) sums[i] = (sums[i] ?? 0) + Number(v);
         buf += `            <E>\r\n                <V>${v}</V>\r\n                <F2>W</F2>\r\n            </E>\r\n`;

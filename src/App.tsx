@@ -18,13 +18,14 @@ import {
   type GeneratedFile,
   type InverterSpec,
   type MsconstSpec,
+  type MavirChannel,
 } from './lib/generators';
 import { DEVICE_BRANDS, DEVICE_TYPES, type DeviceModel } from './lib/deviceTypes';
 import { getCookie, setCookie } from './lib/cookies';
 import { Icon, type IconName } from './Icons';
 import './App.css';
 
-const APP_VERSION = 'v1.2.1';
+const APP_VERSION = 'v1.3.0';
 
 const DEFAULT_SFTP = 'https://sftp.uat.enap.oci/web/client/files';
 const DEFAULT_SWAGGER =
@@ -325,11 +326,18 @@ export default function App() {
   const [genDate, setGenDate] = useState(today());
   const [szinkron, setSzinkron] = useLocalBool('szinkron', true);
   const [meres, setMeres] = useLocalBool('meres', true);
-  const [mavirProd, setMavirProd] = useLocalBool('mavirProd', false); // MAVIR: A- (termelés) az A+ helyett
+  const [mavirProd, setMavirProd] = useLocalBool('mavirProd', false);   // MAVIR: A- (termelés)
+  const [mavirRplus, setMavirRplus] = useLocalBool('mavirRplus', false); // MAVIR: R+ (import meddő)
+  const [mavirRminus, setMavirRminus] = useLocalBool('mavirRminus', false); // MAVIR: R- (export meddő)
   const [inverter, setInverter] = useLocalBool('inverter', false);
   const [invMeres, setInvMeres] = useLocalBool('invMeres', false);
   const [invPair, setInvPair] = useLocalBool('invPair', false);
   const [msconst, setMsconst] = useLocalBool('msconst', false);
+  // MAVIR csatornák: A+ mindig, a többi bepipálva. A sorrend a <DATA> blokkok sorrendje; az összesítő az A+.
+  const mavirChannels: MavirChannel[] = ['A+'];
+  if (mavirProd) mavirChannels.push('A-');
+  if (mavirRplus) mavirChannels.push('R+');
+  if (mavirRminus) mavirChannels.push('R-');
   // MSCONST mezők (alapból a minta értékei, szerkeszthetők)
   const [msChannel, setMsChannel] = useLocalStorage('msChannel', 'A+');
   const [msValueName, setMsValueName] = useLocalStorage('msValueName', '1.29.99.145');
@@ -424,8 +432,9 @@ export default function App() {
     if (!meres || !from) return 0;
     const fromMs = new Date(from + 'T00:00:00').getTime();
     const intervals = Math.max(0, Math.floor((Date.now() - fromMs) / FIFTEEN_MIN_MS));
-    return podCount * intervals * (mavirProd ? 2 : 1); // A- bekapcsolva POD-onként két csatorna (A+ és A-)
-  }, [meres, from, podCount, mavirProd]);
+    const chCount = 1 + (mavirProd ? 1 : 0) + (mavirRplus ? 1 : 0) + (mavirRminus ? 1 : 0); // A+ + a bepipált csatornák
+    return podCount * intervals * chCount;
+  }, [meres, from, podCount, mavirProd, mavirRplus, mavirRminus]);
 
   async function copyText(text: string, key: string) {
     try {
@@ -535,7 +544,7 @@ export default function App() {
     try {
       const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres, inverter, invMeres, invPair, msconst }, spec, mkForGen, msconstSpec, (frac) => {
         if (runRef.current === myRun) setToast({ pct: Math.round(frac * 100), done: false });
-      }, pocs, mavirProd ? ['A+', 'A-'] : ['A+']);
+      }, pocs, mavirChannels);
       if (runRef.current !== myRun) return; // időközben új generálás indult
       setFiles(res.files);
       setToast({ pct: 100, done: true });
@@ -573,7 +582,7 @@ export default function App() {
           const w = await fh.createWritable();
           for await (const chunk of mavirXmlChunks(groupPods, fromDate, now, now, (frac) => {
             if (runRef.current === myRun) setToast({ pct: Math.round(((pi + frac) / parts) * 100), done: false });
-          }, groupSums, mavirProd ? ['A+', 'A-'] : ['A+'])) {
+          }, groupSums, mavirChannels)) {
             await w.write(chunk);
           }
           await w.close();
@@ -625,7 +634,7 @@ export default function App() {
       const sums: number[] = new Array(pods.length).fill(0);
       for await (const chunk of mavirXmlChunks(pods, fromDate, now, now, (frac) => {
         if (runRef.current === myRun) setToast({ pct: Math.round(frac * 100), done: false });
-      }, sums, mavirProd ? ['A+', 'A-'] : ['A+'])) {
+      }, sums, mavirChannels)) {
         await writable.write(chunk);
       }
       await writable.close();
@@ -931,7 +940,11 @@ export default function App() {
                     <label className="check"><input type="checkbox" checked={msconst} onChange={(e) => setMsconst(e.target.checked)} /> <span>MSCONST → SFTP</span></label>
                   </div>
                   {meres && (
-                    <label className="check" style={{ marginLeft: 24 }}><input type="checkbox" checked={mavirProd} onChange={(e) => setMavirProd(e.target.checked)} /> <span>A- csatorna is (termelés) — az <code>A+</code> mellé, ugyanabban a fájlban</span></label>
+                    <div className="check-row" style={{ marginLeft: 24 }}>
+                      <label className="check"><input type="checkbox" checked={mavirProd} onChange={(e) => setMavirProd(e.target.checked)} /> <span>A- (termelés)</span></label>
+                      <label className="check"><input type="checkbox" checked={mavirRplus} onChange={(e) => setMavirRplus(e.target.checked)} /> <span>R+ (import meddő)</span></label>
+                      <label className="check"><input type="checkbox" checked={mavirRminus} onChange={(e) => setMavirRminus(e.target.checked)} /> <span>R- (export meddő)</span></label>
+                    </div>
                   )}
                   <label className="check"><input type="checkbox" checked={inverter} onChange={(e) => setInverter(e.target.checked)} /> <span>Inverter gyártói törzsadat (JSON) → Swagger</span></label>
                   <label className="check"><input type="checkbox" checked={invPair} onChange={(e) => setInvPair(e.target.checked)} /> <span>Inverter párosítás (JSON) → RabbitMQ</span></label>
@@ -951,9 +964,10 @@ export default function App() {
                   </p>
                 )}
 
-                {meres && mavirProd && (
+                {meres && (mavirProd || mavirRplus || mavirRminus) && (
                   <p className="hint">
-                    A MAVIR fájl POD-onként <b>két <code>&lt;DATA&gt;</code> blokkot</b> tartalmaz: <b>A+</b> (fogyasztás, OBIS <code>1.29.99.128</code>) <b>és A-</b> (termelés, OBIS <code>2.29.99.128</code>) — 15 perces bontásban.
+                    A MAVIR POD-onként külön <code>&lt;DATA&gt;</code> blokk csatornánként (15 perc): <b>{mavirChannels.join(', ')}</b>.
+                    <br />A+ <code>1.29.99.128</code> kWh · A- <code>2.29.99.128</code> kWh · R+ <code>3.29.99.128</code> kVArh · R- <code>4.29.99.128</code> kVArh.
                   </p>
                 )}
                 {meres && mavirPoints > 300_000 && (
