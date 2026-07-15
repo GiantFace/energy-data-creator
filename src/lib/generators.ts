@@ -76,7 +76,9 @@ export type BundleResult = { pods: number; points: number; invDevices: number; f
 const TRADER = 'TEST-FEAK';
 // Mérlegkör-felelős fallback EIC; a SZINKRON-ban a kiválasztott BALANCE_RESPONSIBLES (merlegkor) felülírja.
 const BALANCE_EIC = '15X-SINERGY----D';
-const MEAS_OBIS = '1.29.99.128';
+const MEAS_OBIS = '1.29.99.128';        // A+ (vételezés/fogyasztás) load-profil OBIS
+const MEAS_OBIS_PROD = '2.29.99.128';   // A- (betáplálás/termelés) OBIS – a +A OBIS -A megfelelője
+export type MavirChannel = 'A+' | 'A-';
 
 // Mérlegkör felelősök a pod-registry-db-ből. Az `eic` kerül a [Merlegkor_Felelos] mezőbe ÉS
 // (fájlnév-biztosan) a SZINKRON fájlnév partner-mezőjébe – valódi, regisztrált értékkel.
@@ -97,6 +99,7 @@ export const BALANCE_RESPONSIBLES: BalanceResponsible[] = [
   { eic: "HARVEY'S PARTNER", name: "HARVEY'S PARTNER DDK" },
   { eic: '15X-PGP-TSL1---6', name: 'PAKS TESZT' },
   { eic: '15X-HRVYS-BR-1', name: 'Balareg Harveys Kft.' },
+  { eic: 'FEAKFECOOAA0001', name: 'FEAK-FECOO-AA-0001' },
 ];
 
 // Fájlnév-biztos partner: a nem [A-Za-z0-9.-] karaktereket (pl. '_', szóköz, aposztróf) kötőjelre
@@ -238,8 +241,10 @@ export async function* mavirXmlChunks(
   generated: Date,
   onProgress?: (frac: number) => void,
   sums?: number[], // POD-onkénti energiaösszeg (kWh) – az összesítő TXT-hez, generálás közben gyűjtve
+  channel: MavirChannel = 'A+', // A+ (fogyasztás) vagy A- (termelés) adatcsatorna
 ): AsyncGenerator<string, void, unknown> {
   const stepMs = 15 * 60_000;
+  const obis = channel === 'A-' ? MEAS_OBIS_PROD : MEAS_OBIS;
   const perPod = Math.max(0, Math.floor((end.getTime() - from.getTime()) / stepMs));
   const total = Math.max(1, pods.length * perPod);
   let buf =
@@ -253,8 +258,8 @@ export async function* mavirXmlChunks(
     const p = pods[i];
     buf += '    <DATA>\r\n';
     buf += `        <LOC-KEY>${p}</LOC-KEY>\r\n`;
-    buf += '        <CHANNEL-NAME>A+</CHANNEL-NAME>\r\n';
-    buf += `        <VALUE-NAME>${MEAS_OBIS}</VALUE-NAME>\r\n`;
+    buf += `        <CHANNEL-NAME>${channel}</CHANNEL-NAME>\r\n`;
+    buf += `        <VALUE-NAME>${obis}</VALUE-NAME>\r\n`;
     buf += '        <VALUE-UNIT>kwh</VALUE-UNIT>\r\n        <T-FACTOR>1</T-FACTOR>\r\n        <INTERVAL>00:15:00</INTERVAL>\r\n';
     buf += '        <BLOCK>\r\n';
     buf += `            <START-DATETIME>${isoLocal(from)}</START-DATETIME>\r\n`;
@@ -376,11 +381,12 @@ async function buildMavirXml(
   generated: Date,
   onProgress?: (frac: number) => void,
   sums?: number[],
+  channel: MavirChannel = 'A+',
 ): Promise<{ blob: Blob; points: number }> {
   const stepMs = 15 * 60_000;
   const perPod = Math.max(0, Math.floor((end.getTime() - from.getTime()) / stepMs));
   const blobParts: BlobPart[] = [];
-  for await (const chunk of mavirXmlChunks(pods, from, end, generated, onProgress, sums)) blobParts.push(chunk);
+  for await (const chunk of mavirXmlChunks(pods, from, end, generated, onProgress, sums, channel)) blobParts.push(chunk);
   return { blob: new Blob(blobParts, { type: 'application/octet-stream' }), points: pods.length * perPod };
 }
 
@@ -536,6 +542,7 @@ export async function generateBundle(
   msconstSpec: MsconstSpec,
   onProgress?: (frac: number) => void,
   pocs?: string[], // importált SZINKRON esetén POD-onkénti FOGYHELY_AZON (a párosítás poc-ja); egyébként undefined
+  mavirChannel: MavirChannel = 'A+', // MAVIR mérés adatcsatornája: A+ (fogyasztás) vagy A- (termelés)
 ): Promise<BundleResult> {
   let { szinkron, meres, inverter, invMeres, invPair, msconst } = outputs;
   if (!szinkron && !meres && !inverter && !invMeres && !invPair && !msconst) { szinkron = true; meres = true; }
@@ -580,7 +587,7 @@ export async function generateBundle(
     for (let pi = 0; pi < parts; pi++) {
       const groupPods = pods.slice(pi * podsPerFile, (pi + 1) * podsPerFile);
       const groupSums = new Array(groupPods.length).fill(0);
-      const { blob, points: pts } = await buildMavirXml(groupPods, from, now, now, onProgress, groupSums);
+      const { blob, points: pts } = await buildMavirXml(groupPods, from, now, now, onProgress, groupSums, mavirChannel);
       points += pts;
       for (let i = 0; i < groupSums.length; i++) sums[pi * podsPerFile + i] = groupSums[i];
       const part = parts > 1 ? `_part${pi + 1}of${parts}` : '';

@@ -24,16 +24,16 @@ import { getCookie, setCookie } from './lib/cookies';
 import { Icon, type IconName } from './Icons';
 import './App.css';
 
-const APP_VERSION = 'v1.0.0';
+const APP_VERSION = 'v1.1.0';
 
 const DEFAULT_SFTP = 'https://sftp.uat.enap.oci/web/client/files';
 const DEFAULT_SWAGGER =
   'https://device-data-receiver.uat.enap.oci/swagger/swagger-ui/index.html#/inverter-controller/receiveMasterDataFromManufacturer_1';
-// Inverter MÉRÉSADAT (v1.2 inverter-controller) – külön a párosítás (master-data) végpontjától.
+// Inverter MÉRÉSADAT (v1.1 inverter-controller) – külön a párosítás (master-data) végpontjától.
 const DEFAULT_SWAGGER_MEAS =
-  'https://device-data-receiver.uat.enap.oci/swagger/swagger-ui/index.html#/inverter-controller/receiveMeasurementData_3';
-// A v1.2 inverter mérésadat TÉNYLEGES API-végpontja (a cert-alapú POST-hoz, nem a Swagger UI-hoz).
-const API_MEAS_URL = 'https://device-data-receiver.uat.enap.oci/api/v1.2/inverter/measurement-data';
+  'https://device-data-receiver.uat.enap.oci/swagger/swagger-ui/index.html#/inverter-controller/receiveMeasurementData_5';
+// A v1.1 inverter mérésadat TÉNYLEGES API-végpontja (a cert-alapú POST-hoz, nem a Swagger UI-hoz).
+const API_MEAS_URL = 'https://device-data-receiver.uat.enap.oci/api/v1.1/inverter/measurement-data';
 const DEFAULT_CERT_CN = 'feak-uat'; // a kliens-tanúsítvány CN-je (Cert:\CurrentUser\My) – Beállításokban átírható
 const PGWEB_URL = 'https://pgweb-ui.uat.enap.oci/#';
 
@@ -124,7 +124,7 @@ const FILE_GROUPS: { key: string; label: string }[] = [
   { key: 'msconst', label: 'MSCONST (MAVIR EDW_XML, konstans) → SFTP' },
   { key: 'master', label: 'Inverter gyártói törzsadat → Swagger' },
   { key: 'pair', label: 'Inverter párosítás → RabbitMQ' },
-  { key: 'meas', label: 'Inverter mérésadat (v1.2) → Swagger' },
+  { key: 'meas', label: 'Inverter mérésadat (v1.1) → Swagger' },
 ];
 function fileGroup(f: GeneratedFile): string {
   switch (f.target) {
@@ -325,6 +325,7 @@ export default function App() {
   const [genDate, setGenDate] = useState(today());
   const [szinkron, setSzinkron] = useLocalBool('szinkron', true);
   const [meres, setMeres] = useLocalBool('meres', true);
+  const [mavirProd, setMavirProd] = useLocalBool('mavirProd', false); // MAVIR: A- (termelés) az A+ helyett
   const [inverter, setInverter] = useLocalBool('inverter', false);
   const [invMeres, setInvMeres] = useLocalBool('invMeres', false);
   const [invPair, setInvPair] = useLocalBool('invPair', false);
@@ -534,7 +535,7 @@ export default function App() {
     try {
       const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres, inverter, invMeres, invPair, msconst }, spec, mkForGen, msconstSpec, (frac) => {
         if (runRef.current === myRun) setToast({ pct: Math.round(frac * 100), done: false });
-      }, pocs);
+      }, pocs, mavirProd ? 'A-' : 'A+');
       if (runRef.current !== myRun) return; // időközben új generálás indult
       setFiles(res.files);
       setToast({ pct: 100, done: true });
@@ -572,7 +573,7 @@ export default function App() {
           const w = await fh.createWritable();
           for await (const chunk of mavirXmlChunks(groupPods, fromDate, now, now, (frac) => {
             if (runRef.current === myRun) setToast({ pct: Math.round(((pi + frac) / parts) * 100), done: false });
-          }, groupSums)) {
+          }, groupSums, mavirProd ? 'A-' : 'A+')) {
             await w.write(chunk);
           }
           await w.close();
@@ -624,7 +625,7 @@ export default function App() {
       const sums: number[] = new Array(pods.length).fill(0);
       for await (const chunk of mavirXmlChunks(pods, fromDate, now, now, (frac) => {
         if (runRef.current === myRun) setToast({ pct: Math.round(frac * 100), done: false });
-      }, sums)) {
+      }, sums, mavirProd ? 'A-' : 'A+')) {
         await writable.write(chunk);
       }
       await writable.close();
@@ -649,7 +650,7 @@ export default function App() {
 
   const targetLabel = (t: string) =>
     t === 'swagger' ? 'Swagger (gyártói törzsadat)'
-      : t === 'measurement' ? 'Swagger (mérés v1.2)'
+      : t === 'measurement' ? 'Swagger (mérés v1.1)'
       : t === 'rabbit' ? 'RabbitMQ Management'
       : 'SFTP web kliens';
   const targetUrl = (t: string) =>
@@ -929,6 +930,9 @@ export default function App() {
                     <label className="check"><input type="checkbox" checked={meres} onChange={(e) => setMeres(e.target.checked)} /> <span>MAVIR mérés (XML) → SFTP</span></label>
                     <label className="check"><input type="checkbox" checked={msconst} onChange={(e) => setMsconst(e.target.checked)} /> <span>MSCONST → SFTP</span></label>
                   </div>
+                  {meres && (
+                    <label className="check" style={{ marginLeft: 24 }}><input type="checkbox" checked={mavirProd} onChange={(e) => setMavirProd(e.target.checked)} /> <span>A- adatcsatorna (termelés) — az <code>A+</code> helyett</span></label>
+                  )}
                   <label className="check"><input type="checkbox" checked={inverter} onChange={(e) => setInverter(e.target.checked)} /> <span>Inverter gyártói törzsadat (JSON) → Swagger</span></label>
                   <label className="check"><input type="checkbox" checked={invPair} onChange={(e) => setInvPair(e.target.checked)} /> <span>Inverter párosítás (JSON) → RabbitMQ</span></label>
                   <label className="check"><input type="checkbox" checked={invMeres} onChange={(e) => setInvMeres(e.target.checked)} /> <span>Inverter mérésadat (JSON) → Swagger</span></label>
@@ -943,10 +947,15 @@ export default function App() {
                 {invMeres && (
                   <p className="hint">
                     Az inverter mérésadat <b>serialNumber-alapú</b> (OBIS <code>2.8.0</code>, 5 perces idősor), <b>inverterenként egy fájl</b>.
-                    A <b>v1.2</b> végpont <code>200</code> = párosítva (PodRegistry-ben), <code>202</code>/„Missing device data" = nincs párosítva.
+                    A <b>v1.1</b> végpont a <b>formátumot</b> validálja (<code>200</code> = beküldve) — a párosítást önmagában nem bizonyítja.
                   </p>
                 )}
 
+                {meres && mavirProd && (
+                  <p className="hint">
+                    A MAVIR mérés az <b>A-</b> csatornán, <b>termelési</b> adatként megy — OBIS <code>2.29.99.128</code> (az <code>A+</code> / <code>1.29.99.128</code> helyett).
+                  </p>
+                )}
                 {meres && mavirPoints > 300_000 && (
                   <p className={`hint${mavirPoints > MAVIR_POINTS_CAP ? ' warn' : ''}`}>
                     MAVIR: ~<b>{mavirPoints.toLocaleString('hu-HU')}</b> adatpont készülne ({podCount} POD × 15 perces idősor).
@@ -1160,7 +1169,7 @@ export default function App() {
                                     {f.target === 'measurement' && (
                                       <button
                                         className="ghost sm"
-                                        title="Kész PowerShell parancs (cert-alapú POST a v1.2 mérés-végpontra) másolása"
+                                        title="Kész PowerShell parancs (cert-alapú POST a v1.1 mérés-végpontra) másolása"
                                         onClick={() => { copyText(buildPsCommand(f.name, API_MEAS_URL, certName), `ps:${f.name}`); markUsed(f.name); }}
                                       >
                                         {copied === `ps:${f.name}`
@@ -1318,7 +1327,7 @@ export default function App() {
                 <p className="desc">A generált fájlok melletti linkek ezekre mutatnak.</p>
                 <label className="full"><span>SFTP web kliens (SZINKRON / MAVIR)</span><input value={sftpUrl} onChange={(e) => setSftpUrl(e.target.value)} /></label>
                 <label className="full" style={{ marginTop: 12 }}><span>Swagger UI — inverter gyártói törzsadat (receiveMasterDataFromManufacturer)</span><input value={swaggerUrl} onChange={(e) => setSwaggerUrl(e.target.value)} /></label>
-                <label className="full" style={{ marginTop: 12 }}><span>Swagger UI — inverter mérésadat (v1.2 measurement)</span><input value={swaggerMeasUrl} onChange={(e) => setSwaggerMeasUrl(e.target.value)} /></label>
+                <label className="full" style={{ marginTop: 12 }}><span>Swagger UI — inverter mérésadat (v1.1 measurement)</span><input value={swaggerMeasUrl} onChange={(e) => setSwaggerMeasUrl(e.target.value)} /></label>
                 <label className="full" style={{ marginTop: 12 }}><span>Kliens-tanúsítvány CN (PS parancs · Cert:\CurrentUser\My)</span><input value={certName} onChange={(e) => setCertName(e.target.value)} placeholder="feak-uat" /></label>
                 <label className="full" style={{ marginTop: 12 }}><span>RabbitMQ Management — inverter párosítás (pod-registry.inverter-pod-data)</span><input value={rabbitUrl} onChange={(e) => setRabbitUrl(e.target.value)} /></label>
                 <label className="full" style={{ marginTop: 12 }}><span>mongo-express — beküldés-ellenőrzés (pod-registry-db Messages)</span><input value={mongoUrl} onChange={(e) => setMongoUrl(e.target.value)} /></label>
