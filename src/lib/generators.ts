@@ -376,21 +376,70 @@ export function mavirFileNames(pods: string[], merlegkor: string | undefined, pa
   return Array.from({ length: parts }, (_, i) => `${dso}_${partner}_Eseti_FF_EGYEDI1_part${i + 1}of${parts}_${sfx}.xml`);
 }
 
-// In-memory Blob (kis/közepes MAVIR, vagy ha nincs lemez-streamelés) – a chunk-generátorból építve.
-async function buildMavirXml(
+// A MAVIR mérést ~0,5 MB-os, ÖNÁLLÓAN érvényes EDW_XML fájlokra bontja (mindegyik <=~0,5 MB), hogy a
+// file-processor Kafka-üzenete (serial-ts topic) a ~1 MB limit alatt maradjon. Egy POD+csatorna idősora
+// is átnyúlhat több fájlba: a folytatás ott új <DATA> blokk, a részkezdethez igazított START-DATETIME-mel.
+// A sums (összesítő) az első csatorna (A+) értékeiből gyűlik. Szinkron – a kis/közepes MAVIR itt épül.
+const MAVIR_PART_TARGET_BYTES = 500 * 1024; // ~0,5 MB / fájl
+function buildMavirParts(
   pods: string[],
   from: Date,
   end: Date,
   generated: Date,
-  onProgress?: (frac: number) => void,
-  sums?: number[],
   channels: MavirChannel[] = ['A+'],
-): Promise<{ blob: Blob; points: number }> {
+  sums?: number[],
+  targetBytes = MAVIR_PART_TARGET_BYTES,
+): { content: string; points: number }[] {
   const stepMs = 15 * 60_000;
-  const perPod = Math.max(0, Math.floor((end.getTime() - from.getTime()) / stepMs));
-  const blobParts: BlobPart[] = [];
-  for await (const chunk of mavirXmlChunks(pods, from, end, generated, onProgress, sums, channels)) blobParts.push(chunk);
-  return { blob: new Blob(blobParts, { type: 'application/octet-stream' }), points: pods.length * perPod * channels.length };
+  const header =
+    "<?xml version='1.0' encoding='UTF-8'?>\r\n" +
+    '<EDW_XML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://tempuri.org/MAVIR">\r\n' +
+    '    <HEADER>\r\n        <VERSION>1.0</VERSION>\r\n        <GENERATOR>WM_XML_Generator</GENERATOR>\r\n' +
+    `        <GENERATED-DATETIME>${isoLocal(generated)}</GENERATED-DATETIME>\r\n    </HEADER>\r\n`;
+  const footer = '</EDW_XML>';
+  const dataHead = (p: string, ch: MavirChannel, obis: string, startMs: number) =>
+    '    <DATA>\r\n' +
+    `        <LOC-KEY>${p}</LOC-KEY>\r\n` +
+    `        <CHANNEL-NAME>${ch}</CHANNEL-NAME>\r\n` +
+    `        <VALUE-NAME>${obis}</VALUE-NAME>\r\n` +
+    '        <VALUE-UNIT>kwh</VALUE-UNIT>\r\n        <T-FACTOR>1</T-FACTOR>\r\n        <INTERVAL>00:15:00</INTERVAL>\r\n' +
+    '        <BLOCK>\r\n' +
+    `            <START-DATETIME>${isoLocal(new Date(startMs))}</START-DATETIME>\r\n`;
+  const dataFoot = '        </BLOCK>\r\n    </DATA>\r\n';
+
+  const files: { content: string; points: number }[] = [];
+  let buf = header;
+  let filePoints = 0;
+  const flush = () => {
+    if (filePoints > 0) files.push({ content: buf + footer, points: filePoints });
+    buf = header;
+    filePoints = 0;
+  };
+
+  for (let i = 0; i < pods.length; i++) {
+    const p = pods[i];
+    for (const ch of channels) {
+      const obis = ch === 'A-' ? MEAS_OBIS_PROD : MEAS_OBIS;
+      let blockOpen = false;
+      for (let t = from.getTime(); t < end.getTime(); t += stepMs) {
+        if (!blockOpen) { buf += dataHead(p, ch, obis, t); blockOpen = true; }
+        const v = (100 + Math.random() * 1400).toFixed(2);
+        if (sums && ch === channels[0]) sums[i] = (sums[i] ?? 0) + Number(v);
+        buf += `            <E>\r\n                <V>${v}</V>\r\n                <F2>W</F2>\r\n            </E>\r\n`;
+        filePoints++;
+        // Elérte a célméretet → zárjuk a blokkot és a fájlt; a következő intervallum új fájlban új blokkot nyit.
+        if (buf.length + dataFoot.length + footer.length >= targetBytes) {
+          buf += dataFoot;
+          blockOpen = false;
+          flush();
+        }
+      }
+      if (blockOpen) buf += dataFoot;
+    }
+  }
+  flush();
+  if (!files.length) files.push({ content: header + footer, points: 0 });
+  return files;
 }
 
 // Inverter gyártói törzsadat – a LAPOS `devices` formátum, amit az
@@ -585,27 +634,25 @@ export async function generateBundle(
 
   if (meres) {
     const sums: number[] = new Array(count).fill(0);
-    // ~1 GB felett POD-onként több önálló, érvényes EDW_XML fájlra bontunk (megosztott terv).
-    const { podsPerFile, parts } = mavirSplitPlan(count, from, now);
-    for (let pi = 0; pi < parts; pi++) {
-      const groupPods = pods.slice(pi * podsPerFile, (pi + 1) * podsPerFile);
-      const groupSums = new Array(groupPods.length).fill(0);
-      const { blob, points: pts } = await buildMavirXml(groupPods, from, now, now, onProgress, groupSums, mavirChannels);
-      points += pts;
-      for (let i = 0; i < groupSums.length; i++) sums[pi * podsPerFile + i] = groupSums[i];
-      const part = parts > 1 ? `_part${pi + 1}of${parts}` : '';
+    // ~0,5 MB-os, ÖNÁLLÓAN érvényes EDW_XML részekre bontva – így a file-processor Kafka-üzenete
+    // (serial-ts topic) a ~1 MB limit alatt marad, és minden rész külön letölthető.
+    const parts = buildMavirParts(pods, from, now, now, mavirChannels, sums);
+    const n = parts.length;
+    parts.forEach((pf, pi) => {
+      points += pf.points;
+      const part = n > 1 ? `_part${pi + 1}of${n}` : '';
       files.push({
         name: `${dso}_${fileSafePartner(mkf)}_Eseti_FF_EGYEDI1${part}_${suffix}.xml`,
-        content: '',
-        blob,
+        content: pf.content,
         mime: 'text/xml',
         target: 'sftp',
-        hint: parts > 1
-          ? `MAVIR mérés (${pi + 1}/${parts} rész) – töltsd fel az SFTP-re`
+        hint: n > 1
+          ? `MAVIR mérés (${pi + 1}/${n} rész, ~0,5 MB) – töltsd fel az SFTP-re`
           : 'MAVIR mérés – töltsd fel az SFTP-re',
-        meta: `${groupPods.length} POD, ${pts} pont`,
+        meta: `~${Math.round(pf.content.length / 1024)} KB · ${pf.points} pont`,
       });
-    }
+    });
+    onProgress?.(0.9);
     files.push({
       name: `energia_osszesito_${suffix}.txt`,
       content: buildEnergyReport(pods, sums, from, now, now),
