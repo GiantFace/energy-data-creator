@@ -367,13 +367,17 @@ export function mavirSplitPlan(podCount: number, from: Date, end: Date): { podsP
   return { podsPerFile, parts };
 }
 
-// A MAVIR (rész)fájlnevek – KÖZÖS időbélyeggel, rész-jelöléssel (part{i}of{n}), ha több részre bontunk.
+// A MAVIR (rész)fájlnevek – mindegyik ÖNÁLLÓ, szabályos MAVIR név: ..._Eseti_FF_EGYEDI1_<YYYYMMDD>_<HHMMSS>.xml.
+// NINCS partXofY infix: azt a MAVIR fájlnév-parser INVALID_FORMAT_CANNOT_PROCESS-szal elutasítja. Az egyediséget
+// a generálási időhöz adott rész-index (másodperc) adja, így minden résznek szabályos, de eltérő neve lesz.
 export function mavirFileNames(pods: string[], merlegkor: string | undefined, parts: number): string[] {
   const dso = pods.length ? dsoNoFromPod(pods[0]) : 'EHE000000';
   const partner = fileSafePartner(merlegkor || BALANCE_EIC);
-  const sfx = uniqueSuffix(new Date());
-  if (parts <= 1) return [`${dso}_${partner}_Eseti_FF_EGYEDI1_${sfx}.xml`];
-  return Array.from({ length: parts }, (_, i) => `${dso}_${partner}_Eseti_FF_EGYEDI1_part${i + 1}of${parts}_${sfx}.xml`);
+  const base = new Date();
+  return Array.from({ length: Math.max(1, parts) }, (_, i) => {
+    const t = new Date(base.getTime() + i * 1000);
+    return `${dso}_${partner}_Eseti_FF_EGYEDI1_${ymd(t)}_${hms(t)}.xml`;
+  });
 }
 
 // A MAVIR mérést ~0,5 MB-os, ÖNÁLLÓAN érvényes EDW_XML fájlokra bontja (mindegyik <=~0,5 MB), hogy a
@@ -638,16 +642,18 @@ export async function generateBundle(
     // (serial-ts topic) a ~1 MB limit alatt marad, és minden rész külön letölthető.
     const parts = buildMavirParts(pods, from, now, now, mavirChannels, sums);
     const n = parts.length;
+    // Minden rész ÖNÁLLÓ, SZABÁLYOS MAVIR fájlnevet kap (NEM partXofY: azt a fájlnév-parser elutasítja –
+    // dsoId/merlegkör/dátum mezők null-ra jönnének → INVALID_FORMAT_CANNOT_PROCESS); a nevek mp-enként egyediek.
+    const names = mavirFileNames(pods, mkf, n);
     parts.forEach((pf, pi) => {
       points += pf.points;
-      const part = n > 1 ? `_part${pi + 1}of${n}` : '';
       files.push({
-        name: `${dso}_${fileSafePartner(mkf)}_Eseti_FF_EGYEDI1${part}_${suffix}.xml`,
+        name: names[pi],
         content: pf.content,
         mime: 'text/xml',
         target: 'sftp',
         hint: n > 1
-          ? `MAVIR mérés (${pi + 1}/${n} rész, ~0,5 MB) – töltsd fel az SFTP-re`
+          ? `MAVIR mérés (${pi + 1}/${n} rész, ~0,5 MB/fájl) – töltsd fel az SFTP-re`
           : 'MAVIR mérés – töltsd fel az SFTP-re',
         meta: `~${Math.round(pf.content.length / 1024)} KB · ${pf.points} pont`,
       });
