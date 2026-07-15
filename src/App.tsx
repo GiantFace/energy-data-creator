@@ -25,7 +25,7 @@ import { getCookie, setCookie } from './lib/cookies';
 import { Icon, type IconName } from './Icons';
 import './App.css';
 
-const APP_VERSION = 'v1.3.0';
+const APP_VERSION = 'v1.3.1';
 
 const DEFAULT_SFTP = 'https://sftp.uat.enap.oci/web/client/files';
 const DEFAULT_SWAGGER =
@@ -987,7 +987,6 @@ export default function App() {
                 )}
 
                 {error && <p className="error">{error}</p>}
-                {!(inverter || invMeres) && !msconst && <button className="primary" onClick={onGenerate}>Generálás</button>}
               </CollapsibleCard>
 
               {(inverter || invMeres) && (
@@ -1015,7 +1014,6 @@ export default function App() {
                     <label><span>acVoltageMin</span><input type="number" value={vmin} onChange={(e) => setVmin(e.target.value)} /></label>
                     <label><span>acVoltageMax</span><input type="number" value={vmax} onChange={(e) => setVmax(e.target.value)} /></label>
                     <label><span>Ügyfél e-mail (customerMail)</span><input type="email" value={customerMail} placeholder="pl. teszt@feak.hu" onChange={(e) => setCustomerMail(e.target.value)} /></label>
-                    <div className="gen-cell"><button className="primary" onClick={onGenerate}>Generálás</button></div>
                   </div>
                 </CollapsibleCard>
               )}
@@ -1036,10 +1034,14 @@ export default function App() {
                     <label><span>START-DATETIME</span><input type="datetime-local" step={1} value={msStart} onChange={(e) => setMsStart(e.target.value)} /></label>
                     <label><span>Érték min (V)</span><input type="number" value={msMin} onChange={(e) => setMsMin(e.target.value)} /></label>
                     <label><span>Érték max (V)</span><input type="number" value={msMax} onChange={(e) => setMsMax(e.target.value)} /></label>
-                    {!(inverter || invMeres) && <div className="gen-cell"><button className="primary" onClick={onGenerate}>Generálás</button></div>}
                   </div>
                 </CollapsibleCard>
               )}
+
+              {/* Egy, MINDIG látható Generálás gomb – a kártyák alatt, összecsukott/bepipált állapottól függetlenül. */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+                <button className="primary" onClick={onGenerate}>Generálás</button>
+              </div>
 
               {sftpNames.length > 0 && (
                 <section className="card side-panel">
