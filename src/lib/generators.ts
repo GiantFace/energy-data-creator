@@ -241,12 +241,11 @@ export async function* mavirXmlChunks(
   generated: Date,
   onProgress?: (frac: number) => void,
   sums?: number[], // POD-onkénti energiaösszeg (kWh) – az összesítő TXT-hez, generálás közben gyűjtve
-  channel: MavirChannel = 'A+', // A+ (fogyasztás) vagy A- (termelés) adatcsatorna
+  channels: MavirChannel[] = ['A+'], // A+ (fogyasztás) és/vagy A- (termelés) – POD-onként külön <DATA> blokk
 ): AsyncGenerator<string, void, unknown> {
   const stepMs = 15 * 60_000;
-  const obis = channel === 'A-' ? MEAS_OBIS_PROD : MEAS_OBIS;
   const perPod = Math.max(0, Math.floor((end.getTime() - from.getTime()) / stepMs));
-  const total = Math.max(1, pods.length * perPod);
+  const total = Math.max(1, pods.length * perPod * channels.length);
   let buf =
     "<?xml version='1.0' encoding='UTF-8'?>\r\n" +
     '<EDW_XML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://tempuri.org/MAVIR">\r\n' +
@@ -256,26 +255,30 @@ export async function* mavirXmlChunks(
   let lastTick = Date.now();
   for (let i = 0; i < pods.length; i++) {
     const p = pods[i];
-    buf += '    <DATA>\r\n';
-    buf += `        <LOC-KEY>${p}</LOC-KEY>\r\n`;
-    buf += `        <CHANNEL-NAME>${channel}</CHANNEL-NAME>\r\n`;
-    buf += `        <VALUE-NAME>${obis}</VALUE-NAME>\r\n`;
-    buf += '        <VALUE-UNIT>kwh</VALUE-UNIT>\r\n        <T-FACTOR>1</T-FACTOR>\r\n        <INTERVAL>00:15:00</INTERVAL>\r\n';
-    buf += '        <BLOCK>\r\n';
-    buf += `            <START-DATETIME>${isoLocal(from)}</START-DATETIME>\r\n`;
-    for (let t = from.getTime(); t < end.getTime(); t += stepMs) {
-      const v = (100 + Math.random() * 1400).toFixed(2);
-      if (sums) sums[i] = (sums[i] ?? 0) + Number(v);
-      buf += `            <E>\r\n                <V>${v}</V>\r\n                <F2>W</F2>\r\n            </E>\r\n`;
-      points++;
-      if (buf.length >= 1_000_000) {
-        onProgress?.(points / total);
-        yield buf;
-        buf = '';
-        if (Date.now() - lastTick > 40) { lastTick = Date.now(); await new Promise<void>((r) => setTimeout(r)); }
+    // POD-onként minden kért csatorna külön <DATA> blokk (A+ és/vagy A-). Az összesítő (sums) az első csatorna.
+    for (const channel of channels) {
+      const obis = channel === 'A-' ? MEAS_OBIS_PROD : MEAS_OBIS;
+      buf += '    <DATA>\r\n';
+      buf += `        <LOC-KEY>${p}</LOC-KEY>\r\n`;
+      buf += `        <CHANNEL-NAME>${channel}</CHANNEL-NAME>\r\n`;
+      buf += `        <VALUE-NAME>${obis}</VALUE-NAME>\r\n`;
+      buf += '        <VALUE-UNIT>kwh</VALUE-UNIT>\r\n        <T-FACTOR>1</T-FACTOR>\r\n        <INTERVAL>00:15:00</INTERVAL>\r\n';
+      buf += '        <BLOCK>\r\n';
+      buf += `            <START-DATETIME>${isoLocal(from)}</START-DATETIME>\r\n`;
+      for (let t = from.getTime(); t < end.getTime(); t += stepMs) {
+        const v = (100 + Math.random() * 1400).toFixed(2);
+        if (sums && channel === channels[0]) sums[i] = (sums[i] ?? 0) + Number(v);
+        buf += `            <E>\r\n                <V>${v}</V>\r\n                <F2>W</F2>\r\n            </E>\r\n`;
+        points++;
+        if (buf.length >= 1_000_000) {
+          onProgress?.(points / total);
+          yield buf;
+          buf = '';
+          if (Date.now() - lastTick > 40) { lastTick = Date.now(); await new Promise<void>((r) => setTimeout(r)); }
+        }
       }
+      buf += '        </BLOCK>\r\n    </DATA>\r\n';
     }
-    buf += '        </BLOCK>\r\n    </DATA>\r\n';
   }
   buf += '</EDW_XML>';
   onProgress?.(1);
@@ -381,13 +384,13 @@ async function buildMavirXml(
   generated: Date,
   onProgress?: (frac: number) => void,
   sums?: number[],
-  channel: MavirChannel = 'A+',
+  channels: MavirChannel[] = ['A+'],
 ): Promise<{ blob: Blob; points: number }> {
   const stepMs = 15 * 60_000;
   const perPod = Math.max(0, Math.floor((end.getTime() - from.getTime()) / stepMs));
   const blobParts: BlobPart[] = [];
-  for await (const chunk of mavirXmlChunks(pods, from, end, generated, onProgress, sums, channel)) blobParts.push(chunk);
-  return { blob: new Blob(blobParts, { type: 'application/octet-stream' }), points: pods.length * perPod };
+  for await (const chunk of mavirXmlChunks(pods, from, end, generated, onProgress, sums, channels)) blobParts.push(chunk);
+  return { blob: new Blob(blobParts, { type: 'application/octet-stream' }), points: pods.length * perPod * channels.length };
 }
 
 // Inverter gyártói törzsadat – a LAPOS `devices` formátum, amit az
@@ -542,7 +545,7 @@ export async function generateBundle(
   msconstSpec: MsconstSpec,
   onProgress?: (frac: number) => void,
   pocs?: string[], // importált SZINKRON esetén POD-onkénti FOGYHELY_AZON (a párosítás poc-ja); egyébként undefined
-  mavirChannel: MavirChannel = 'A+', // MAVIR mérés adatcsatornája: A+ (fogyasztás) vagy A- (termelés)
+  mavirChannels: MavirChannel[] = ['A+'], // MAVIR mérés csatornái: [A+] vagy [A+, A-] (POD-onként külön blokk)
 ): Promise<BundleResult> {
   let { szinkron, meres, inverter, invMeres, invPair, msconst } = outputs;
   if (!szinkron && !meres && !inverter && !invMeres && !invPair && !msconst) { szinkron = true; meres = true; }
@@ -587,7 +590,7 @@ export async function generateBundle(
     for (let pi = 0; pi < parts; pi++) {
       const groupPods = pods.slice(pi * podsPerFile, (pi + 1) * podsPerFile);
       const groupSums = new Array(groupPods.length).fill(0);
-      const { blob, points: pts } = await buildMavirXml(groupPods, from, now, now, onProgress, groupSums, mavirChannel);
+      const { blob, points: pts } = await buildMavirXml(groupPods, from, now, now, onProgress, groupSums, mavirChannels);
       points += pts;
       for (let i = 0; i < groupSums.length; i++) sums[pi * podsPerFile + i] = groupSums[i];
       const part = parts > 1 ? `_part${pi + 1}of${parts}` : '';
