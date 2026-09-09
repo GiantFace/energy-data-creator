@@ -113,11 +113,15 @@ function fileSafePartner(s: string): string {
   return (s || '').replace(/[^A-Za-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '') || TRADER;
 }
 
+// A SZINKRON fejléce – az „ENAP fájlfeldolgozás követelményei" szerint RÖGZÍTETT, nem paraméterezhető.
+// (A korábbi verzió csupa nagybetűs neveket írt, és az utolsó két oszlop [HMKE_IGENY]|[HMKE_BE] volt
+//  a követelményben szereplő [HMKE_TDIJ_KEZD]|[HMKE_TMERO_KEZD] helyett.)
 const HEADER =
-  '[Ellatas_Kezd]|[Ellatas_Bef]|[Eloszto]|[Kereskedo]|[Merlegkor_Felelos]|[POD]|[FOGYHELY_AZON]|' +
-  '[UF]|[PT]|[FORD_NAP]|[LEOLVASAS]|[ELSZAMOLAS]|[UGYFEL_NEVE_1]|[UGYFEL_NEVE_2]|[UTCA]|[HAZSZAM]|' +
-  '[VAROS]|[IR_SZAM]|[RHD_Fiz]|[RHD_Tarifa]|[RHD_Kieg_1]|[RHD_Kieg_2]|[ELO_lek_kW]|[CsP]|' +
-  '[RHD_Tarifa_kezd]|[ELO_Lek_Kezd]|[Mero_Tarifa]|[Termeles]|[Vedendo]|[Termeles_telj]|[HMKE_IGENY]|[HMKE_BE]';
+  '[Ellatas_Kezd]|[Ellatas_Bef]|[Eloszto]|[Kereskedo]|[Merlegkor_Felelos]|[POD]|[Fogyhely_Azon]|' +
+  '[UF]|[PT]|[Ford_Nap]|[Leolvasas]|[Elszamolas]|[Ugyfel_Neve_1]|[Ugyfel_Neve_2]|[Utca]|[Hazszam]|' +
+  '[Varos]|[Ir_Szam]|[RHD_Fiz]|[RHD_Tarifa]|[RHD_Kieg_1]|[RHD_Kieg_2]|[ELO_Lek_kW]|[CsP]|' +
+  '[RHD_Tarifa_Kezd]|[ELO_Lek_Kezd]|[Mero_Tarifa]|[Termeles]|[Vedendo]|[Termeles_telj]|' +
+  '[HMKE_TDIJ_KEZD]|[HMKE_TMERO_KEZD]';
 
 const pad = (n: number, w = 2) => String(n).padStart(w, '0');
 const ymd = (d: Date) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
@@ -210,17 +214,30 @@ const fogyhelyAzon = (i: number) => String(FOGYHELY_BASE + i);
 
 // A POD-ot kívülről kapja (a közös, beillesztett `pods` készletből) – így a SZINKRON, a MAVIR
 // és az inverter MINDIG bájtra azonos POD-okat használ. Az [Eloszto] a POD-ból levezetett DSO.
-// A `poc` (ha van) a feltöltött SZINKRON FOGYHELY_AZON-ja vagy annak léptetett párja – így a CSV,
+// A követelmény KÖTELEZŐ ellenőrzése: a fájlnévből öröklődő mezők (Eloszto, Kereskedo,
+// Merlegkor_Felelos, Ford_Nap) értéke EGYEZZEN a fájlnévvel. Ezért a `kereskedo` ugyanaz az EIC,
+// ami a fájlnév 3. mezőjébe kerül, a `fordNap` pedig a fájlnév Datum1 (szelekciós dátum) mezője.
+// A `poc` (ha van) a feltöltött SZINKRON Fogyhely_Azon-ja vagy annak léptetett párja – így a CSV,
 // a párosítás és a registry UGYANAZT a fogyasztási helyet kapja. Nélküle a számított érték megy.
-function szinkronRow(p: string, i: number, merlegkor: string, poc?: string): string {
+function szinkronRow(p: string, i: number, merlegkor: string, kereskedo: string, fordNap: string, poc?: string): string {
   const fogyhely = poc || fogyhelyAzon(i);
   return [
-    '2024.09.01', '2040.12.31', dsoNoFromPod(p), TRADER, merlegkor, p, fogyhely,
-    '0.0', 'IDOS', '2026.05.01', '10.01', '10.01', 'Teszt', `Ugyfel${i}`, 'Teszt utca', String(i),
+    ellatasKezd(fordNap), '9999.12.31', dsoNoFromPod(p), kereskedo, merlegkor, p, fogyhely,
+    '0', 'IDOS', fordNap, '10.01', '10.01', 'Teszt', `Ugyfel${i}`, 'Teszt utca', String(i),
     'Budapest', '1011', 'K', 'KOF', 'VIZUGY', 'KOF_A_KIF_T', '60,0000000', '1',
     '2023.01.09', '2021.03.01', '1+0', 'HMKE-02', '001', '1.0', '2025.08.01', '2025.08.01',
   ].join('|');
 }
+
+// [Ellatas_Kezd] <= [Ford_Nap] – a követelmény ezt is ellenőrzi. Alapból 2024.09.01, de ha a
+// szelekciós dátum ennél korábbi, akkor azzal megyünk (különben a sor elbukna az ellenőrzésen).
+const ELLATAS_KEZD_DEFAULT = '2024.09.01';
+function ellatasKezd(fordNap: string): string {
+  return fordNap && fordNap < ELLATAS_KEZD_DEFAULT ? fordNap : ELLATAS_KEZD_DEFAULT;
+}
+
+// A fájlnév Datum1 (szelekciós dátum) mezője éééé.hh.nn alakban – ez megy a [Ford_Nap] oszlopba.
+const ymdDots = (d: Date) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
 
 // A SZINKRON oszlopnevei (a [...] zárójeleket levéve) – a parser fejléc hiányában ezt használja fallbacknek.
 export const SZINKRON_COLUMNS = HEADER.split('|').map((c) => c.replace(/^\[|\]$/g, ''));
@@ -231,20 +248,42 @@ export type SzinkronSource = Record<string, string>;
 // Feltöltött SZINKRON-ból generálva a sor a MINTÁBÓL jön: a cím ([UTCA]/[HAZSZAM]/[VAROS]/[IR_SZAM]),
 // az ügyfél és az összes tarifa-mező VÁLTOZATLANUL a forrássorból; csak a POD és a FOGYHELY_AZON új
 // (a származtatott soroknál). Az oszlopsorrend a generált fejléchez igazodik, a hiányzó mező üres.
-function szinkronRowFromSource(src: Record<string, string>, pod: string, i: number, merlegkor: string, poc?: string): string {
+function szinkronRowFromSource(
+  src: Record<string, string>, pod: string, i: number,
+  merlegkor: string, kereskedo: string, fordNap: string, poc?: string,
+): string {
   // Ha a feltöltött fájl fejléce eltér (hiányzó oszlop), a beépített mintasor adott mezője pótolja –
-  // így a kimenet akkor sem lesz hiányos/érvénytelen. A ÜRESEN hagyott mezőt viszont NEM töltjük ki
-  // (az a minta szándéka), kivéve a FOGYHELY_AZON-t: annak egyeznie kell a párosítás poc-jával.
-  const fallback = szinkronRow(pod, i, merlegkor, poc).split('|');
-  const row: Record<string, string> = {
-    ...src,
-    POD: pod,
-    FOGYHELY_AZON: poc || src['FOGYHELY_AZON'] || fogyhelyAzon(i),
-  };
+  // így a kimenet akkor sem lesz hiányos/érvénytelen. Az ÜRESEN hagyott mezőt viszont NEM töltjük ki
+  // (az a minta szándéka), kivéve a Fogyhely_Azon-t: annak egyeznie kell a párosítás poc-jával.
+  const fallback = szinkronRow(pod, i, merlegkor, kereskedo, fordNap, poc).split('|');
+  const get = srcLookup(src);
   return SZINKRON_COLUMNS.map((c, ci) => {
-    const v = row[c];
+    // A fájlnévből öröklődő mezőket KÖTELEZŐ a fájlnévhez igazítani (a validátor ezt ellenőrzi),
+    // ezért ezeket a mintából NEM vesszük át.
+    if (c === 'POD') return pod;
+    if (c === 'Kereskedo') return kereskedo;
+    if (c === 'Ford_Nap') return fordNap;
+    // Az Ellatas_Kezd a mintából jön, DE a követelmény szerint <= Ford_Nap – ha későbbi lenne,
+    // a szelekciós dátumra húzzuk vissza, különben a sor elbukna az ellenőrzésen.
+    if (c === 'Ellatas_Kezd') { const v = get(c)?.trim(); return v && v <= fordNap ? v : ellatasKezd(fordNap); }
+    if (c === 'Fogyhely_Azon') return poc || get(c) || fogyhelyAzon(i);
+    const v = get(c);
     return v === undefined ? (fallback[ci] ?? '') : v.trim();
   }).join('|');
+}
+
+// Oszlop-kiolvasás a forrássorból KIS/NAGYBETŰ-eltéréstől függetlenül: a korábbi verzió által
+// generált (és utána visszatöltött) SZINKRON-ok csupa nagybetűs fejlécet írtak ([FOGYHELY_AZON]),
+// a követelmény viszont [Fogyhely_Azon]-t ír elő – mindkettőt fel kell ismernünk.
+function srcLookup(src: Record<string, string>): (col: string) => string | undefined {
+  const map = new Map<string, string>();
+  for (const k of Object.keys(src)) map.set(k.trim().toLowerCase(), src[k]);
+  return (col: string) => map.get(col.trim().toLowerCase());
+}
+
+// Egy mező kiolvasása a parsolt sorból, a fejléc kis/nagybetűs írásmódjától függetlenül.
+export function szinkronField(row: Record<string, string>, col: string): string {
+  return srcLookup(row)(col) ?? '';
 }
 
 // A SZINKRON [UTCA] mezője a közterület nevét ÉS jellegét együtt tartalmazza (pl. „Kossuth utca"),
@@ -359,8 +398,20 @@ export function expandSzinkronRows(base: SzinkronRowKey[], total: number): Szink
       poc,
       // A forrássor MINDEN mezője öröklődik (UTCA/HAZSZAM/VAROS/IR_SZAM, ügyfél, tarifák) –
       // csak a POD és a FOGYHELY_AZON az új.
-      row: src.row ? { ...src.row, POD: pod, FOGYHELY_AZON: poc || (src.row['FOGYHELY_AZON'] ?? '') } : undefined,
+      row: src.row ? withPodPoc(src.row, pod, poc) : undefined,
     });
+  }
+  return out;
+}
+
+// A származtatott sor: a forrássor másolata, de a POD és a Fogyhely_Azon az új érték – a MEGLÉVŐ
+// oszlopnév-írásmóddal felülírva (különben két kulcs maradna: pl. FOGYHELY_AZON és Fogyhely_Azon).
+function withPodPoc(row: Record<string, string>, pod: string, poc: string): Record<string, string> {
+  const out = { ...row };
+  for (const k of Object.keys(out)) {
+    const kk = k.trim().toLowerCase();
+    if (kk === 'pod') out[k] = pod;
+    else if (kk === 'fogyhely_azon') out[k] = poc || out[k];
   }
   return out;
 }
@@ -374,13 +425,16 @@ export type SzinkronRowKey = {
 };
 export function szinkronKeyRows(rows: Record<string, string>[]): SzinkronRowKey[] {
   return rows
-    .map((r) => ({
-      pod: r['POD'] ?? '',
-      poc: r['FOGYHELY_AZON'] ?? '',
-      merlegkor: r['Merlegkor_Felelos'] ?? '',
-      eloszto: r['Eloszto'] ?? '',
-      row: r,
-    }))
+    .map((r) => {
+      const get = srcLookup(r);
+      return {
+        pod: get('POD') ?? '',
+        poc: get('Fogyhely_Azon') ?? '',
+        merlegkor: get('Merlegkor_Felelos') ?? '',
+        eloszto: get('Eloszto') ?? '',
+        row: r,
+      };
+    })
     .filter((r) => r.pod);
 }
 
@@ -787,10 +841,17 @@ export async function generateBundle(
   const mkf = merlegkor || BALANCE_EIC;
 
   if (szinkron) {
+    // A fájlnév 3. mezője a KERESKEDŐ EIC-je – a követelmény szerint a [Kereskedo] oszlopnak ezzel
+    // EGYEZNIE kell (a [Merlegkor_Felelos] alapértelmezésben szintén ez). A [Ford_Nap] pedig a
+    // fájlnév Datum1 (szelekciós dátum) mezője.
+    const kereskedo = fileSafePartner(mkf);
+    const fordNap = ymdDots(from);
     // Feltöltött SZINKRON-nál a forrássor mezőivel (cím, ügyfél, tarifák), egyébként a beépített mintasorral.
     const lines = [HEADER, ...pods.map((p, k) => {
       const src = srcRows?.[k];
-      return src ? szinkronRowFromSource(src, p, k + 1, mkf, pocs?.[k]) : szinkronRow(p, k + 1, mkf, pocs?.[k]);
+      return src
+        ? szinkronRowFromSource(src, p, k + 1, mkf, kereskedo, fordNap, pocs?.[k])
+        : szinkronRow(p, k + 1, mkf, kereskedo, fordNap, pocs?.[k]);
     })];
     // A parser a fájlnév VÉGÉN két 8-jegyű dátumot vár: <szelekció YYYYMMDD>_<generálás YYYYMMDD>.
     // Idő (HHMMSS) ide INVALID_FORMAT-ot okoz, ezért itt NEM az egyedi időbélyeget használjuk.

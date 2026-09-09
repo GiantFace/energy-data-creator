@@ -30,7 +30,7 @@ import { getCookie, setCookie } from './lib/cookies';
 import { Icon, type IconName } from './Icons';
 import './App.css';
 
-const APP_VERSION = 'v1.4.3';
+const APP_VERSION = 'v1.5.0';
 
 const DEFAULT_SFTP = 'https://sftp.uat.enap.oci/web/client/files';
 const DEFAULT_SWAGGER =
@@ -470,6 +470,13 @@ export default function App() {
   const podMaxLabel = podCap.max > 1e9 ? 'gyakorlatilag korlátlan számú' : podCap.max.toLocaleString('hu-HU');
   // A mintában mutatott UTOLSÓ POD sorszáma – a kapacitásra vágva, hogy ne mutassunk nem létező POD-ot.
   const podLastNo = Math.min(podCount, podCap.max);
+  // A SZINKRON fájlnév 3. mezője – a követelmény szerint a KERESKEDŐ EIC-je, FIX 16 karakter, és a
+  // [Kereskedo] (valamint alapértelmezésben a [Merlegkor_Felelos]) oszlopnak ezzel egyeznie kell.
+  // A fájlnév csak [A-Za-z0-9.-]-t bír el, ezért a többi karaktert kötőjelre cseréljük – ha emiatt
+  // (vagy a hossz miatt) eltér, azt jelezzük, mert a feldolgozó formai hibát adhat rá.
+  const eicInName = merlegkor.replace(/[^A-Za-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '');
+  const eicChanged = eicInName !== merlegkor;
+  const eicBadLen = eicInName.length !== 16;
   // Hány 15 perces intervallum van a mérés kezdetétől mostanáig – ebből jön a MAVIR ÉS az inverter
   // mérés becsült adatpontszáma is (a mérés vége mindig a mostani idő).
   const intervals15 = useMemo(() => {
@@ -1080,15 +1087,23 @@ export default function App() {
                 </p>
 
                 <label className="full" style={{ marginTop: 4 }}>
-                  <span>Mérlegkör felelős (SZINKRON [Merlegkor_Felelos] + fájlnév partnere)</span>
+                  <span>Kereskedő / mérlegkör felelős EIC (fájlnév + [Kereskedo] + [Merlegkor_Felelos])</span>
                   <select value={merlegkor} onChange={(e) => setMerlegkor(e.target.value)}>
                     {BALANCE_RESPONSIBLES.map((b) => (
                       <option key={b.eic} value={b.eic}>{b.eic} — {b.name}</option>
                     ))}
                   </select>
                 </label>
-                <p className="hint">
-                  A SZINKRON fájlnév partnere: <code>Szinkron_{dso}_{merlegkor.replace(/[^A-Za-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '')}_…</code> — valódi, regisztrált érték a DB-ből.
+                <p className={`hint${eicBadLen || eicChanged ? ' warn' : ''}`}>
+                  A SZINKRON fájlnév: <code>Szinkron_{dso}_{eicInName}_{from.replace(/-/g, '')}_{(genDate || today()).replace(/-/g, '')}.csv</code> — a
+                  3. mező a <b>kereskedő EIC-je</b>, és a követelmény szerint a <code>[Kereskedo]</code> oszlopnak
+                  ezzel <b>egyeznie kell</b> (a <code>[Merlegkor_Felelos]</code> alapértelmezésben szintén ez), a
+                  <code> [Ford_Nap]</code> pedig a fájlnév <b>Datum1</b> mezője (a mérés kezdete).
+                  {eicBadLen && <> ⚠ Az EIC <b>{eicInName.length} karakter</b>, a követelmény <b>fix 16-ot</b> ír elő —
+                    a feldolgozó ezért formai hibával elutasíthatja a fájlt.</>}
+                  {eicChanged && <> ⚠ A fájlnév csak <code>A-Z a-z 0-9 . -</code> karaktereket bír el, ezért az EIC
+                    <code> {merlegkor}</code> helyett <code>{eicInName}</code> alakban kerül bele (és a
+                    <code> [Kereskedo]</code> oszlopba is) — válassz olyan EIC-t, amit a fájlnév változtatás nélkül elbír.</>}
                 </p>
 
                 <div className="checks">
