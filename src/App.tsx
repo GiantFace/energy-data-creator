@@ -30,7 +30,7 @@ import { getCookie, setCookie } from './lib/cookies';
 import { Icon, type IconName } from './Icons';
 import './App.css';
 
-const APP_VERSION = 'v1.4.1';
+const APP_VERSION = 'v1.4.2';
 
 const DEFAULT_SFTP = 'https://sftp.uat.enap.oci/web/client/files';
 const DEFAULT_SWAGGER =
@@ -229,6 +229,9 @@ const FILES_KEY = 'enap_generated_files';
 // A MAVIR mérés felső korlátja: ennél több adatpontból a böngésző nem tud egy fájlt építeni
 // (~80 karakter/pont → string-méret/memória korlát). E felett a generálás nem indul el.
 const MAVIR_POINTS_CAP = 2_000_000;
+// Ennyi POD-onkénti fájl (párosítás / inverter mérésadat) fölött külön engedély kell – a fájllista
+// és a böngésző memóriája is megfekszik tőle.
+const PER_POD_FILES_CAP = 2_000;
 const FIFTEEN_MIN_MS = 15 * 60_000;
 
 function loadStoredFiles(): GeneratedFile[] | null {
@@ -419,7 +422,9 @@ export default function App() {
 
   // A felismert POD-ok és a gyanús (nem 33 karakteres) elemek.
   const realPods = useMemo(() => parsePods(podsText), [podsText]);
-  const badPods = useMemo(() => realPods.filter((p) => p.length > 33), [realPods]);
+  // A master-data validátora PONTOSAN 33 karaktert vár (a 32 karakteres POD is „Invalid POD format”),
+  // ezért a rövidebbre is figyelmeztetünk, nem csak a hosszabbra.
+  const badPods = useMemo(() => realPods.filter((p) => p.length !== 33), [realPods]);
 
   // A generáláshoz kiválasztott feltöltött SZINKRON profil + a belőle nyert kulcs-sorok (POD/poc/mérlegkör).
   const selectedSz = useMemo(() => savedSz.find((s) => s.id === selectedSzId) ?? null, [savedSz, selectedSzId]);
@@ -457,13 +462,24 @@ export default function App() {
   const podMaxLabel = podCap.max > 1e9 ? 'gyakorlatilag korlátlan számú' : podCap.max.toLocaleString('hu-HU');
   // A mintában mutatott UTOLSÓ POD sorszáma – a kapacitásra vágva, hogy ne mutassunk nem létező POD-ot.
   const podLastNo = Math.min(podCount, podCap.max);
-  const mavirPoints = useMemo(() => {
-    if (!meres || !from) return 0;
+  // Hány 15 perces intervallum van a mérés kezdetétől mostanáig – ebből jön a MAVIR ÉS az inverter
+  // mérés becsült adatpontszáma is (a mérés vége mindig a mostani idő).
+  const intervals15 = useMemo(() => {
+    if (!from) return 0;
     const fromMs = new Date(from + 'T00:00:00').getTime();
-    const intervals = Math.max(0, Math.floor((Date.now() - fromMs) / FIFTEEN_MIN_MS));
+    return Math.max(0, Math.floor((Date.now() - fromMs) / FIFTEEN_MIN_MS));
+  }, [from]);
+  const mavirPoints = useMemo(() => {
+    if (!meres) return 0;
     const chCount = 1 + (mavirProd ? 1 : 0) + (mavirRplus ? 1 : 0) + (mavirRminus ? 1 : 0); // A+ + a bepipált csatornák
-    return podCount * intervals * chCount;
-  }, [meres, from, podCount, mavirProd, mavirRplus, mavirRminus]);
+    return podCount * intervals15 * chCount;
+  }, [meres, intervals15, podCount, mavirProd, mavirRplus, mavirRminus]);
+  // Az inverter mérésadat 5 PERCES (3× sűrűbb a MAVIR-nál), POD-onként külön fájl, és NINCS
+  // lemezre streamelés – ezért ugyanúgy meg kell fogni, mint a MAVIR-t, különben elszáll a fül.
+  const invPoints = invMeres ? podCount * intervals15 * 3 : 0;
+  // POD-onként EGY fájl készül a párosításból és az inverter mérésadatból – sok POD-nál (a SZINKRON
+  // felszorzásával ez egy gépelés) ez több ezer letölthető fájl, ami a listát/böngészőt megfogja.
+  const perPodFiles = (invPair ? podCount : 0) + (invMeres ? podCount : 0);
 
   async function copyText(text: string, key: string) {
     try {
@@ -546,6 +562,23 @@ export default function App() {
     const mkForGen = (podMode === 'szinkron' && szMerlegkor) ? szMerlegkor : merlegkor;
     if (!from) { setError('Válassz érvényes mérés-kezdő dátumot.'); return; }
     if (!szinkron && !meres && !inverter && !invMeres && !invPair && !msconst) { setError('Pipálj ki legalább egy kimenetet.'); return; }
+    if (perPodFiles > PER_POD_FILES_CAP && !allowLarge) {
+      setError(
+        `Túl sok fájl készülne: ~${perPodFiles.toLocaleString('hu-HU')} db (POD-onként egy párosítás` +
+          `${invMeres ? ' és egy inverter mérésadat' : ''} fájl, ${podCount} POD-ra). Pipáld be a „Nagy generálás ` +
+          `engedélyezése" négyzetet, vagy csökkentsd a POD-ok számát.`,
+      );
+      return;
+    }
+    if (invMeres && invPoints > MAVIR_POINTS_CAP && !allowLarge) {
+      setError(
+        `Túl nagy inverter mérésadat: ~${invPoints.toLocaleString('hu-HU')} adatpont ` +
+          `(${podCount} POD × 5 perces idősor, POD-onként külön fájl). Pipáld be a „Nagy generálás ` +
+          `engedélyezése" négyzetet, ha mindenképp ennyit szeretnél, vagy válassz későbbi mérés-kezdő ` +
+          `dátumot / kevesebb POD-ot.`,
+      );
+      return;
+    }
     if (meres && mavirPoints > MAVIR_POINTS_CAP && !allowLarge) {
       setError(
         `Túl nagy MAVIR adatmennyiség: ~${mavirPoints.toLocaleString('hu-HU')} adatpont ` +
@@ -858,7 +891,9 @@ export default function App() {
                         <input
                           type="number"
                           min={1}
-                          max={podBodyAuto ? undefined : podCap.max}
+                          /* A max csak akkor kerül ki, ha értelmes szám: rövid törzsnél a kapacitás
+                             10^21 fölé megy, és az input max="1e+21"-et kapna (érvénytelen attribútum). */
+                          max={!podBodyAuto && podCap.max <= 1e9 ? podCap.max : undefined}
                           value={count}
                           onChange={(e) => setCount(e.target.value)}
                         />
@@ -988,7 +1023,8 @@ export default function App() {
                     </p>
                     {badPods.length > 0 && (
                       <p className="hint warn">
-                        ⚠ {badPods.length} POD hosszabb 33 karakternél (a DDR max 33-at enged) — ellenőrizd: <code>{badPods[0]}</code>
+                        ⚠ {badPods.length} POD nem pontosan 33 karakter ({badPods[0].length}) — a master-data
+                        validátora ezt „Invalid POD format"-tal elutasítja; ellenőrizd: <code>{badPods[0]}</code>
                         {badPods.length > 1 ? ` …(+${badPods.length - 1})` : ''}
                       </p>
                     )}
@@ -1078,7 +1114,24 @@ export default function App() {
                   </p>
                 )}
 
-                {meres && mavirPoints > MAVIR_POINTS_CAP && (
+                {invMeres && invPoints > 300_000 && (
+                  <p className={`hint${invPoints > MAVIR_POINTS_CAP ? ' warn' : ''}`}>
+                    Inverter mérésadat: ~<b>{invPoints.toLocaleString('hu-HU')}</b> adatpont ({podCount} POD × 5 perces
+                    idősor), POD-onként külön fájl.
+                    {invPoints > MAVIR_POINTS_CAP
+                      ? ` ⚠ Ez nem streamelhető lemezre, mint a MAVIR — engedélyezd alább, vagy rövidíts.`
+                      : ' A generálás eltarthat egy ideig.'}
+                  </p>
+                )}
+
+                {perPodFiles > PER_POD_FILES_CAP && (
+                  <p className="hint warn">
+                    ⚠ ~<b>{perPodFiles.toLocaleString('hu-HU')}</b> külön fájl készülne ({podCount} POD × POD-onkénti
+                    párosítás{invMeres ? ' + mérésadat' : ''}) — engedélyezd alább, vagy csökkentsd a POD-ok számát.
+                  </p>
+                )}
+
+                {((meres && mavirPoints > MAVIR_POINTS_CAP) || (invMeres && invPoints > MAVIR_POINTS_CAP) || perPodFiles > PER_POD_FILES_CAP) && (
                   <label className="check" style={{ marginTop: 6 }}>
                     <input type="checkbox" checked={allowLarge} onChange={(e) => setAllowLarge(e.target.checked)} />
                     <span>Nagy generálás engedélyezése (lassú lehet, extrém méretnél a böngésző elszállhat)</span>

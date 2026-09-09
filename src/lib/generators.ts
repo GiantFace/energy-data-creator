@@ -231,9 +231,20 @@ export type SzinkronSource = Record<string, string>;
 // Feltöltött SZINKRON-ból generálva a sor a MINTÁBÓL jön: a cím ([UTCA]/[HAZSZAM]/[VAROS]/[IR_SZAM]),
 // az ügyfél és az összes tarifa-mező VÁLTOZATLANUL a forrássorból; csak a POD és a FOGYHELY_AZON új
 // (a származtatott soroknál). Az oszlopsorrend a generált fejléchez igazodik, a hiányzó mező üres.
-function szinkronRowFromSource(src: Record<string, string>, pod: string, poc?: string): string {
-  const row: Record<string, string> = { ...src, POD: pod, FOGYHELY_AZON: poc || src['FOGYHELY_AZON'] || '' };
-  return SZINKRON_COLUMNS.map((c) => (row[c] ?? '').trim()).join('|');
+function szinkronRowFromSource(src: Record<string, string>, pod: string, i: number, merlegkor: string, poc?: string): string {
+  // Ha a feltöltött fájl fejléce eltér (hiányzó oszlop), a beépített mintasor adott mezője pótolja –
+  // így a kimenet akkor sem lesz hiányos/érvénytelen. A ÜRESEN hagyott mezőt viszont NEM töltjük ki
+  // (az a minta szándéka), kivéve a FOGYHELY_AZON-t: annak egyeznie kell a párosítás poc-jával.
+  const fallback = szinkronRow(pod, i, merlegkor, poc).split('|');
+  const row: Record<string, string> = {
+    ...src,
+    POD: pod,
+    FOGYHELY_AZON: poc || src['FOGYHELY_AZON'] || fogyhelyAzon(i),
+  };
+  return SZINKRON_COLUMNS.map((c, ci) => {
+    const v = row[c];
+    return v === undefined ? (fallback[ci] ?? '') : v.trim();
+  }).join('|');
 }
 
 // A SZINKRON [UTCA] mezője a közterület nevét ÉS jellegét együtt tartalmazza (pl. „Kossuth utca"),
@@ -778,7 +789,7 @@ export async function generateBundle(
     // Feltöltött SZINKRON-nál a forrássor mezőivel (cím, ügyfél, tarifák), egyébként a beépített mintasorral.
     const lines = [HEADER, ...pods.map((p, k) => {
       const src = srcRows?.[k];
-      return src ? szinkronRowFromSource(src, p, pocs?.[k]) : szinkronRow(p, k + 1, mkf, pocs?.[k]);
+      return src ? szinkronRowFromSource(src, p, k + 1, mkf, pocs?.[k]) : szinkronRow(p, k + 1, mkf, pocs?.[k]);
     })];
     // A parser a fájlnév VÉGÉN két 8-jegyű dátumot vár: <szelekció YYYYMMDD>_<generálás YYYYMMDD>.
     // Idő (HHMMSS) ide INVALID_FORMAT-ot okoz, ezért itt NEM az egyedi időbélyeget használjuk.
