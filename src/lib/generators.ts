@@ -109,7 +109,7 @@ export const BALANCE_RESPONSIBLES: BalanceResponsible[] = [
 
 // Fájlnév-biztos partner: a nem [A-Za-z0-9.-] karaktereket (pl. '_', szóköz, aposztróf) kötőjelre
 // cseréli, hogy a SZINKRON fájlnév két végdátumát a parser biztosan ki tudja olvasni.
-function fileSafePartner(s: string): string {
+export function fileSafePartner(s: string): string {
   return (s || '').replace(/[^A-Za-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '') || TRADER;
 }
 
@@ -238,6 +238,12 @@ function ellatasKezd(fordNap: string): string {
 
 // A fájlnév Datum1 (szelekciós dátum) mezője éééé.hh.nn alakban – ez megy a [Ford_Nap] oszlopba.
 const ymdDots = (d: Date) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+
+// A generált SZINKRON fájl neve – a felület ELŐRE ki tudja számolni belőle a várható nevet, hogy
+// jelezhesse, ha ugyanaz a név már készült (az SFTP nem engedi felülírni a meglévő fájlt).
+export function szinkronFileName(dso: string, partner: string, from: Date, genDate: Date): string {
+  return `Szinkron_${dso}_${fileSafePartner(partner)}_${ymd(from)}_${ymd(genDate)}.csv`;
+}
 
 // A SZINKRON oszlopnevei (a [...] zárójeleket levéve) – a parser fejléc hiányában ezt használja fallbacknek.
 export const SZINKRON_COLUMNS = HEADER.split('|').map((c) => c.replace(/^\[|\]$/g, ''));
@@ -857,7 +863,7 @@ export async function generateBundle(
     // Idő (HHMMSS) ide INVALID_FORMAT-ot okoz, ezért itt NEM az egyedi időbélyeget használjuk.
     // A partner-mező a kiválasztott (valódi) mérlegkör felelős EIC – fájlnév-biztos formában.
     files.push({
-      name: `Szinkron_${dso}_${fileSafePartner(mkf)}_${ymd(from)}_${ymd(genDate)}.csv`,
+      name: szinkronFileName(dso, mkf, from, genDate),
       content: lines.join('\r\n') + '\r\n',
       mime: 'text/csv',
       target: 'sftp',

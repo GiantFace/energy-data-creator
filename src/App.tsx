@@ -20,6 +20,9 @@ import {
   parseSzinkron,
   szinkronKeyRows,
   expandSzinkronRows,
+  szinkronFileName,
+  fileSafePartner,
+  dsoNoFromPod,
   type GeneratedFile,
   type InverterSpec,
   type MsconstSpec,
@@ -30,7 +33,7 @@ import { getCookie, setCookie } from './lib/cookies';
 import { Icon, type IconName } from './Icons';
 import './App.css';
 
-const APP_VERSION = 'v1.5.0';
+const APP_VERSION = 'v1.5.1';
 
 const DEFAULT_SFTP = 'https://sftp.uat.enap.oci/web/client/files';
 const DEFAULT_SWAGGER =
@@ -225,6 +228,16 @@ async function downloadZip(files: GeneratedFile[]) {
 
 // A generált fájlok megőrzése oldal-újratöltésnél (localStorage – túléli a frissítést is).
 const FILES_KEY = 'enap_generated_files';
+// A KORABBAN generált SZINKRON fájlnevek. Az SFTP-n a `teszteles` user létre tud hozni fájlt, de
+// FELÜLÍRNI nem tudja a meglévőt (403 permission denied → a betöltő szkript 400-at naplóz), a
+// SZINKRON név viszont csak dátumot tartalmaz (időt a parser nem fogad el). Ezért ugyanaz a
+// DSO+EIC+Datum1+Datum2 kombináció ugyanazt a nevet adja, és a második feltöltés elakad – ezt
+// előre jelezzük, még generálás előtt.
+const SZ_NAMES_KEY = 'enap_szinkron_names';
+function loadSzNames(): string[] {
+  try { const r = JSON.parse(localStorage.getItem(SZ_NAMES_KEY) || '[]'); return Array.isArray(r) ? r : []; }
+  catch { return []; }
+}
 
 // A MAVIR mérés felső korlátja: ennél több adatpontból a böngésző nem tud egy fájlt építeni
 // (~80 karakter/pont → string-méret/memória korlát). E felett a generálás nem indul el.
@@ -370,6 +383,8 @@ export default function App() {
   const [msMin, setMsMin] = useLocalStorage('msMin', '100');
   const [msMax, setMsMax] = useLocalStorage('msMax', '1500');
   const [allowLarge, setAllowLarge] = useState(false);
+  // A korábban generált SZINKRON fájlnevek (ütközés-figyelmeztetéshez).
+  const [szNames, setSzNames] = useState<string[]>(loadSzNames);
 
   const initModel = DEVICE_TYPES[FIRST_BRAND]?.[0];
   const [brand, setBrand] = useLocalStorage('brand', FIRST_BRAND);
@@ -474,9 +489,21 @@ export default function App() {
   // [Kereskedo] (valamint alapértelmezésben a [Merlegkor_Felelos]) oszlopnak ezzel egyeznie kell.
   // A fájlnév csak [A-Za-z0-9.-]-t bír el, ezért a többi karaktert kötőjelre cseréljük – ha emiatt
   // (vagy a hossz miatt) eltér, azt jelezzük, mert a feldolgozó formai hibát adhat rá.
-  const eicInName = merlegkor.replace(/[^A-Za-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '');
+  const eicInName = fileSafePartner(merlegkor); // ugyanaz a tisztítás, mint a fájlnév-építésnél
   const eicChanged = eicInName !== merlegkor;
   const eicBadLen = eicInName.length !== 16;
+  // A várható SZINKRON fájlnév – ugyanazzal a képlettel, mint a generálás (a DSO a POD-ból jön,
+  // ha nem automatikus a mód; a partner importált SZINKRON-nál a fájl mérlegköre).
+  const firstPod = podMode === 'szinkron' ? szKeysGen[0]?.pod : podMode === 'paste' ? realPods[0] : '';
+  const szSrcMk = podMode === 'szinkron' ? szKeysGen.find((k) => k.merlegkor)?.merlegkor : '';
+  const expectedSzName = szinkronFileName(
+    firstPod ? dsoNoFromPod(firstPod) : dso,
+    szSrcMk || merlegkor,
+    new Date((from || today()) + 'T00:00:00'),
+    new Date((genDate || today()) + 'T00:00:00'),
+  );
+  // Ezt a nevet már generáltuk egyszer → az SFTP a második feltöltést nem engedi (nincs felülírás).
+  const szNameUsed = szinkron && szNames.includes(expectedSzName);
   // Hány 15 perces intervallum van a mérés kezdetétől mostanáig – ebből jön a MAVIR ÉS az inverter
   // mérés becsült adatpontszáma is (a mérés vége mindig a mostani idő).
   const intervals15 = useMemo(() => {
@@ -649,11 +676,24 @@ export default function App() {
       }, pocs, mavirChannels, srcRows);
       if (runRef.current !== myRun) return; // időközben új generálás indult
       setFiles(res.files);
+      rememberSzNames(res.files);
       setToast({ pct: 100, done: true });
       setTimeout(() => { if (runRef.current === myRun) setToast(null); }, 4000);
     } catch {
       if (runRef.current === myRun) { setToast(null); setError('Hiba történt a generálás közben.'); }
     }
+  }
+
+  // A generált SZINKRON fájlneveket megjegyezzük: legközelebb szólunk, ha ugyanaz a név jönne ki
+  // (az SFTP nem engedi felülírni a már feltöltött fájlt, a név pedig csak dátumot tartalmaz).
+  function rememberSzNames(gen: GeneratedFile[]) {
+    const names = gen.filter((f) => f.name.startsWith('Szinkron_')).map((f) => f.name);
+    if (!names.length) return;
+    setSzNames((prev) => {
+      const next = Array.from(new Set([...names, ...prev])).slice(0, 100);
+      try { localStorage.setItem(SZ_NAMES_KEY, JSON.stringify(next)); } catch { /* nem elérhető */ }
+      return next;
+    });
   }
 
   // Nagy MAVIR: a böngésző egy save-dialógusban kéri a helyet, majd ~1 MB-os darabokban a LEMEZRE írja
@@ -702,6 +742,7 @@ export default function App() {
           hint: 'Energia-összesítő (POD ↔ inverter ↔ kWh) a MAVIR mérésből', meta: `${pods.length} POD`,
         };
         setFiles([...res.files, ...partInfos, report]);
+        rememberSzNames(res.files);
         setToast({ pct: 100, done: true });
         setTimeout(() => { if (runRef.current === myRun) setToast(null); }, 4000);
       } catch {
@@ -751,6 +792,7 @@ export default function App() {
         hint: 'Energia-összesítő (POD ↔ inverter ↔ kWh) a MAVIR mérésből', meta: `${pods.length} POD`,
       };
       setFiles([...res.files, mavirInfo, report]);
+      rememberSzNames(res.files);
       setToast({ pct: 100, done: true });
       setTimeout(() => { if (runRef.current === myRun) setToast(null); }, 4000);
     } catch {
@@ -1094,8 +1136,16 @@ export default function App() {
                     ))}
                   </select>
                 </label>
+                {szNameUsed && (
+                  <p className="hint warn">
+                    ⚠ Ezt a SZINKRON fájlnevet <b>már generáltad</b>: <code>{expectedSzName}</code>. Az SFTP-n a
+                    meglévő fájlt <b>nem lehet felülírni</b> (a feltöltő <code>403 permission denied</code> /
+                    <code> 400 operation unsupported</code> hibát ad), a névbe pedig a parser miatt nem tehetünk időt.
+                    Nyomd meg a <b>🎲</b>-t a <b>Generálás dátuma (Datum2)</b> mellett — attól más lesz a fájlnév.
+                  </p>
+                )}
                 <p className={`hint${eicBadLen || eicChanged ? ' warn' : ''}`}>
-                  A SZINKRON fájlnév: <code>Szinkron_{dso}_{eicInName}_{from.replace(/-/g, '')}_{(genDate || today()).replace(/-/g, '')}.csv</code> — a
+                  A SZINKRON fájlnév: <code>{expectedSzName}</code> — a
                   3. mező a <b>kereskedő EIC-je</b>, és a követelmény szerint a <code>[Kereskedo]</code> oszlopnak
                   ezzel <b>egyeznie kell</b> (a <code>[Merlegkor_Felelos]</code> alapértelmezésben szintén ez), a
                   <code> [Ford_Nap]</code> pedig a fájlnév <b>Datum1</b> mezője (a mérés kezdete).
