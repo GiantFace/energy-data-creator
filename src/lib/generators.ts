@@ -225,6 +225,37 @@ function szinkronRow(p: string, i: number, merlegkor: string, poc?: string): str
 // A SZINKRON oszlopnevei (a [...] zárójeleket levéve) – a parser fejléc hiányában ezt használja fallbacknek.
 export const SZINKRON_COLUMNS = HEADER.split('|').map((c) => c.replace(/^\[|\]$/g, ''));
 
+// Egy feltöltött SZINKRON forrássora, oszlopnév → érték (a [...] zárójelek nélkül).
+export type SzinkronSource = Record<string, string>;
+
+// Feltöltött SZINKRON-ból generálva a sor a MINTÁBÓL jön: a cím ([UTCA]/[HAZSZAM]/[VAROS]/[IR_SZAM]),
+// az ügyfél és az összes tarifa-mező VÁLTOZATLANUL a forrássorból; csak a POD és a FOGYHELY_AZON új
+// (a származtatott soroknál). Az oszlopsorrend a generált fejléchez igazodik, a hiányzó mező üres.
+function szinkronRowFromSource(src: Record<string, string>, pod: string, poc?: string): string {
+  const row: Record<string, string> = { ...src, POD: pod, FOGYHELY_AZON: poc || src['FOGYHELY_AZON'] || '' };
+  return SZINKRON_COLUMNS.map((c) => (row[c] ?? '').trim()).join('|');
+}
+
+// A SZINKRON [UTCA] mezője a közterület nevét ÉS jellegét együtt tartalmazza (pl. „Kossuth utca"),
+// a párosítás viszont külön kéri – az utolsó szót leválasztjuk, ha ismert közterület-jelleg.
+const STREET_TYPES = [
+  'utca', 'út', 'útja', 'tér', 'tere', 'körút', 'krt', 'krt.', 'allé', 'sor', 'köz', 'sétány', 'part',
+  'fasor', 'dűlő', 'rakpart', 'lakótelep', 'ltp', 'ltp.', 'telep', 'liget', 'sugárút', 'körönd',
+  'udvar', 'park', 'kert', 'lejtő', 'domb', 'erdősor', 'forduló', 'sétaút', 'u.', 'u',
+];
+// Ékezetre érzéketlen összevetés: a teszt-fájlokban a „tér"/„út" gyakran ékezet nélkül szerepel.
+const noAccent = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const STREET_TYPES_N = STREET_TYPES.map(noAccent);
+function splitStreet(utca: string): { street: string; streetType: string } {
+  const parts = (utca ?? '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return { street: parts.join(' '), streetType: '' };
+  const last = parts[parts.length - 1];
+  if (STREET_TYPES_N.includes(noAccent(last))) {
+    return { street: parts.slice(0, -1).join(' '), streetType: last };
+  }
+  return { street: parts.join(' '), streetType: '' };
+}
+
 export type SzinkronParsed = { columns: string[]; rows: Record<string, string>[] };
 
 // SZINKRON CSV beolvasása: a fejléc ([...] sor) átugorva/feldolgozva, a pipe-delimitált sorok mező-objektumokká.
@@ -249,16 +280,12 @@ export function parseSzinkron(text: string): SzinkronParsed {
   return { columns, rows };
 }
 
-// Egy sorozat-azonosító (POD vagy FOGYHELY_AZON) léptetése a HOSSZ MEGTARTÁSÁVAL – a POD ugyanis fix
-// 33 karakter, egy jegynyi növekedés is „Invalid POD format”-ot adna. A valódi POD-ok nem mindig
-// számmal végződnek (pl. …000000000000HARVEYS), ezért a LEGHOSSZABB számjegy-blokkot léptetjük
-// (egyenlőségnél a jobb szélsőt) – ez adja a legtöbb szabad sorszámot is.
-// `protect` karaktert érintetlenül hagyunk az elején: POD-nál 8-at, mert a HU + 6 jegyű DSO-kódból
-// vezetjük le az [Eloszto]-t és a fájlneveket – azt léptetni más elosztóhoz tenné a POD-ot.
-// null, ha nincs benne szám, vagy ha túlcsordulna (csupa 9) – ilyenkor abból a sorból nem bővítünk.
-function bumpSerial(id: string, by: number, protect = 0): string | null {
-  const head = (id ?? '').slice(0, protect);
-  const rest = (id ?? '').slice(protect);
+// A FOGYHELY_AZON léptetése a HOSSZ MEGTARTÁSÁVAL: a benne lévő leghosszabb számjegy-blokkot növeli
+// (egyenlőségnél a jobb szélsőt) – a poc jellemzően csupa szám (199700001), ott ez a teljes érték.
+// BigInt kell hozzá, mert az azonosító akár 25 jegyű is lehet (a Number ott már pontatlan).
+// null, ha nincs benne szám, vagy ha túlcsordulna (csupa 9) – ilyenkor a poc üresen marad.
+function bumpSerial(id: string, by: number): string | null {
+  const rest = id ?? '';
   let best: { at: number; digits: string } | null = null;
   for (const m of rest.matchAll(/\d+/g)) {
     if (!best || m[0].length >= best.digits.length) best = { at: m.index, digits: m[0] };
@@ -266,27 +293,27 @@ function bumpSerial(id: string, by: number, protect = 0): string | null {
   if (!best) return null;
   const next = (BigInt(best.digits) + BigInt(by)).toString();
   if (next.length > best.digits.length) return null; // hosszabb lenne az azonosító → nem használható
-  return head + rest.slice(0, best.at) + next.padStart(best.digits.length, '0') + rest.slice(best.at + best.digits.length);
+  return rest.slice(0, best.at) + next.padStart(best.digits.length, '0') + rest.slice(best.at + best.digits.length);
 }
 
 // Ugyanaz, de átugorja a már foglalt értékeket (a feltöltött fájlban lévőket és a korábban gyártottakat).
-function bumpUnique(id: string, by: number, used: Set<string>, protect = 0): string | null {
+function bumpUnique(id: string, by: number, used: Set<string>): string | null {
   for (let k = by; k < by + 10_000; k++) {
-    const v = bumpSerial(id, k, protect);
+    const v = bumpSerial(id, k);
     if (!v) return null;
     if (!used.has(v)) return v;
   }
   return null;
 }
 
-// A feltöltött SZINKRON sorainak FELSZORZÁSA `total` darabra: a meglévő sorokból származtat újakat úgy,
-// hogy a POD és a FOGYHELY_AZON végén lévő sorszámot lépteti (a mérlegkör/elosztó a forrássorból öröklődik).
-// Így egy 3 soros fájlból kérhető 100 POD: a SZINKRON CSV mind a 100 sort megkapja (ez hozza létre őket a
-// registry-ben), és MIVEL a MAVIR, az inverter törzsadat/mérés és a párosítás UGYANEBBŐL a POD-készletből
-// dolgozik, mindegyik kimenet automatikusan mind a 100 POD-ra készül.
+// A feltöltött SZINKRON sorainak FELSZORZÁSA `total` darabra.
+// A fájl sorai VÁLTOZATLANUL megmaradnak (azok a valódi, registry-beli POD-ok) – a hiányzó darabot
+// belőlük származtatjuk úgy, hogy a POD VÉGÉRE tesszük a sorszámot (a forrás-POD vége íródik felül,
+// a hossz marad pontosan annyi, amennyi az eredetié – tipikusan 33 karakter):
+//   HU000210F51-U-000000000000HARVEYS + 4. sorszám → HU000210F51-U-000000000000HARV004
+// A sorszám szélessége a kért darabszámhoz igazodik (100 → 3 jegy, 1000 → 4 jegy).
+// A FOGYHELY_AZON a forrássoré léptetve, a cím/ügyfél/tarifa és a mérlegkör a forrássorból öröklődik.
 // `total` <= a sorok száma esetén csak az első `total` sort adja vissza (szűkítés).
-// Ha egy POD nem léptethető tovább (túlcsordulna), azt kihagyja – ezért a visszaadott tömb RÖVIDEBB is lehet
-// a kértnél; a hívó a hossz alapján tud figyelmeztetni.
 export function expandSzinkronRows(base: SzinkronRowKey[], total: number): SzinkronRowKey[] {
   const want = Math.max(0, Math.floor(total) || 0);
   if (!base.length || !want) return [];
@@ -294,28 +321,46 @@ export function expandSzinkronRows(base: SzinkronRowKey[], total: number): Szink
   const out = base.slice();
   const usedPods = new Set(base.map((r) => r.pod));
   const usedPocs = new Set(base.map((r) => r.poc).filter(Boolean));
-  // Körökben megyünk végig a forrássorokon (1., 2., … léptetés), hogy a származtatott POD-ok
-  // egyenletesen oszoljanak el a fájl összes sora között (több DSO/mérlegkör esetén is).
-  for (let round = 1; out.length < want; round++) {
-    let added = 0;
-    for (let i = 0; i < base.length && out.length < want; i++) {
-      const src = base[i];
-      // A POD első 8 karaktere (HU + DSO-kód) VÉDETT – abból jön az [Eloszto] és a fájlnevek.
-      const pod = bumpUnique(src.pod, round, usedPods, 8);
-      if (!pod) continue;
-      const poc = src.poc ? (bumpUnique(src.poc, round, usedPocs) ?? '') : '';
-      usedPods.add(pod);
-      if (poc) usedPocs.add(poc);
-      out.push({ ...src, pod, poc });
-      added++;
+  const width = String(want).length; // ennyi jegy kell a legnagyobb sorszámhoz
+  const made = new Array(base.length).fill(0); // forrássoronként hány származtatottat gyártottunk már
+  for (let n = base.length + 1; n <= want; n++) {
+    // Körbe-körbe a forrássorokon, hogy több DSO/mérlegkör/cím esetén mindegyikből származzon új POD.
+    const si = (n - 1) % base.length;
+    const src = base[si];
+    const stem = src.pod.slice(0, Math.max(0, src.pod.length - width));
+    if (!stem) continue; // védelem: a POD rövidebb, mint a sorszám → abból nem származtatunk
+    // A sorszám a POD VÉGÉN; ütközésnél (két forrássor azonos törzse) a következő szabad számot kapja.
+    let pod = '';
+    for (let k = n; k < n + 10_000; k++) {
+      const cand = stem + String(k).padStart(width, '0').slice(-width);
+      if (!usedPods.has(cand)) { pod = cand; break; }
     }
-    if (!added) break; // egyetlen sor sem léptethető tovább → ennyi fér el
+    if (!pod) continue;
+    // A FOGYHELY_AZON a forrássoré + 1, +2, … (forrássoronként külön számolva, hogy szép sorozat legyen);
+    // a hossz itt is marad, üres poc üresen marad.
+    made[si] += 1;
+    const poc = src.poc ? (bumpUnique(src.poc, made[si], usedPocs) ?? '') : '';
+    usedPods.add(pod);
+    if (poc) usedPocs.add(poc);
+    out.push({
+      ...src,
+      pod,
+      poc,
+      // A forrássor MINDEN mezője öröklődik (UTCA/HAZSZAM/VAROS/IR_SZAM, ügyfél, tarifák) –
+      // csak a POD és a FOGYHELY_AZON az új.
+      row: src.row ? { ...src.row, POD: pod, FOGYHELY_AZON: poc || (src.row['FOGYHELY_AZON'] ?? '') } : undefined,
+    });
   }
   return out;
 }
 
 // A parsolt SZINKRON sorokból a generáláshoz fontos mezők (POD, FOGYHELY_AZON=poc, mérlegkör, eloszto).
-export type SzinkronRowKey = { pod: string; poc: string; merlegkor: string; eloszto: string };
+// A `row` a TELJES forrássor a feltöltött fájlból – ebből megy a cím, az ügyfél és a tarifa-mezők a
+// generált SZINKRON-ba és a párosításba (a származtatott soroknál is, a forrássorból örökölve).
+export type SzinkronRowKey = {
+  pod: string; poc: string; merlegkor: string; eloszto: string;
+  row?: Record<string, string>;
+};
 export function szinkronKeyRows(rows: Record<string, string>[]): SzinkronRowKey[] {
   return rows
     .map((r) => ({
@@ -323,6 +368,7 @@ export function szinkronKeyRows(rows: Record<string, string>[]): SzinkronRowKey[
       poc: r['FOGYHELY_AZON'] ?? '',
       merlegkor: r['Merlegkor_Felelos'] ?? '',
       eloszto: r['Eloszto'] ?? '',
+      row: r,
     }))
     .filter((r) => r.pod);
 }
@@ -546,16 +592,20 @@ function buildMavirParts(
 // inverter-controller/receiveMasterDataFromManufacturer (POST /api/v1.1/inverter-brand/master-data) vár.
 // Nincs pod/podContracts/dataChannels: az inverter-ESZKÖZT regisztrálja (a POD-ot a serialNumber hordozza).
 // A párosítás (pod↔eszköz) külön, RabbitMQ `pod-registry.inverter-pod-data` üzenettel megy.
-function buildInverterMasterData(pods: string[], spec: InverterSpec): string {
-  const devices = pods.map((p, idx) => ({
+// A cím a feltöltött SZINKRON forrássorából (srcRows) jön, ha van – különben a beépített teszt-cím.
+function buildInverterMasterData(pods: string[], spec: InverterSpec, srcRows?: (SzinkronSource | undefined)[]): string {
+  const devices = pods.map((p, idx) => {
+    const src = srcRows?.[idx];
+    const st = splitStreet(src?.['UTCA'] ?? '');
+    return {
     serialNumber: `${p}_INV`,
     address: {
-      zipCode: '1011',
-      city: 'Budapest',
-      street: 'Teszt',
-      streetType: 'allé',
+      zipCode: src?.['IR_SZAM'] || '1011',
+      city: src?.['VAROS'] || 'Budapest',
+      street: st.street || 'Teszt',
+      streetType: st.streetType || 'allé',
       streetCode: String(idx + 1),
-      building: '2',
+      building: src?.['HAZSZAM'] || '2',
       stairway: '4',
       door: '3',
       floor: '1',
@@ -570,7 +620,8 @@ function buildInverterMasterData(pods: string[], spec: InverterSpec): string {
     acVoltageMax: spec.acVoltageMax,
     installationDate: spec.installationDate,
     removalDate: null,
-  }));
+    };
+  });
   return JSON.stringify({ devices }, null, 2);
 }
 
@@ -591,8 +642,11 @@ const PAIRING_CHANNELS: { obisCode: string; name: string; unit: string }[] = [
 
 // Inverter PÁROSÍTÁS üzenet a RabbitMQ `pod-registry.inverter-pod-data` queue-hoz (egy POD / üzenet).
 // EZ az, ami a pod↔eszköz párosítást létrehozza a pod-registry-ben (a Mongo `messages` formátuma szerint).
-function inverterPairingObj(pod: string, spec: InverterSpec, idx: number, pocOverride?: string) {
+// `src` = a feltöltött SZINKRON forrássora (ha van): ebből megy a CÍM a párosításba is, hogy a
+// registry-ben ugyanaz a cím szerepeljen, mint a SZINKRON-ban. Nélküle a beépített teszt-cím.
+function inverterPairingObj(pod: string, spec: InverterSpec, idx: number, pocOverride?: string, src?: Record<string, string>) {
   const install = spec.installationDate;
+  const st = splitStreet(src?.['UTCA'] ?? '');
   return {
     pod,
     // A POC-szám = a SZINKRON FOGYHELY_AZON-ja → ez a POD PocNo-ja a registry-ben. E nélkül (null) a
@@ -602,12 +656,12 @@ function inverterPairingObj(pod: string, spec: InverterSpec, idx: number, pocOve
     customerMail: spec.customerMail,
     utilityType: 'electricity',
     address: {
-      zipCode: '1011',
-      city: 'Budapest',
-      street: 'Teszt',
-      streetType: 'allé',
+      zipCode: src?.['IR_SZAM'] || '1011',
+      city: src?.['VAROS'] || 'Budapest',
+      street: st.street || 'Teszt',
+      streetType: st.streetType || 'allé',
       streetCode: String(idx + 1),
-      building: '2',
+      building: src?.['HAZSZAM'] || '2',
       stairway: '4',
       door: '3',
       floor: '1',
@@ -642,13 +696,13 @@ function inverterPairingObj(pod: string, spec: InverterSpec, idx: number, pocOve
 
 // Egy POD párosítás-üzenete: { podContracts: [ … ] } wrapper, TÖMÖR (minified) – a RabbitMQ
 // érzékeny a sortörésre/whitespace-re, ezért nem szépítjük. __TypeId__ = …MasterDataMainDto.
-function buildInverterPairing(pod: string, spec: InverterSpec, idx: number, pocOverride?: string): string {
-  return JSON.stringify({ podContracts: [inverterPairingObj(pod, spec, idx, pocOverride)] });
+function buildInverterPairing(pod: string, spec: InverterSpec, idx: number, pocOverride?: string, src?: Record<string, string>): string {
+  return JSON.stringify({ podContracts: [inverterPairingObj(pod, spec, idx, pocOverride, src)] });
 }
 
 // MINDEN POD párosítása egyetlen { podContracts: [ … ] } üzenetben (a „sum" kimenethez) – tömör.
-function buildInverterPairingAll(pods: string[], spec: InverterSpec, pocs?: string[]): string {
-  return JSON.stringify({ podContracts: pods.map((p, idx) => inverterPairingObj(p, spec, idx, pocs?.[idx])) });
+function buildInverterPairingAll(pods: string[], spec: InverterSpec, pocs?: string[], srcRows?: (SzinkronSource | undefined)[]): string {
+  return JSON.stringify({ podContracts: pods.map((p, idx) => inverterPairingObj(p, spec, idx, pocs?.[idx], srcRows?.[idx])) });
 }
 
 // ISO-8601 UTC, ezredmásodperc nélkül (a mérés-DTO <date-time> formátuma, pl. 2026-06-09T08:00:00Z).
@@ -695,6 +749,9 @@ export async function generateBundle(
   onProgress?: (frac: number) => void,
   pocs?: string[], // importált SZINKRON esetén POD-onkénti FOGYHELY_AZON (a párosítás poc-ja); egyébként undefined
   mavirChannels: MavirChannel[] = ['A+'], // MAVIR mérés csatornái: [A+] vagy [A+, A-] (POD-onként külön blokk)
+  // Importált SZINKRON esetén a POD-onkénti FORRÁSSOR: ebből megy a cím/ügyfél/tarifa a generált
+  // SZINKRON-ba ÉS a párosítás címébe – így a kimenet a MINTÁT követi, nem a beépített teszt-adatokat.
+  srcRows?: (SzinkronSource | undefined)[],
 ): Promise<BundleResult> {
   let { szinkron, meres, inverter, invMeres, invPair, msconst } = outputs;
   if (!szinkron && !meres && !inverter && !invMeres && !invPair && !msconst) { szinkron = true; meres = true; }
@@ -718,7 +775,11 @@ export async function generateBundle(
   const mkf = merlegkor || BALANCE_EIC;
 
   if (szinkron) {
-    const lines = [HEADER, ...pods.map((p, k) => szinkronRow(p, k + 1, mkf, pocs?.[k]))];
+    // Feltöltött SZINKRON-nál a forrássor mezőivel (cím, ügyfél, tarifák), egyébként a beépített mintasorral.
+    const lines = [HEADER, ...pods.map((p, k) => {
+      const src = srcRows?.[k];
+      return src ? szinkronRowFromSource(src, p, pocs?.[k]) : szinkronRow(p, k + 1, mkf, pocs?.[k]);
+    })];
     // A parser a fájlnév VÉGÉN két 8-jegyű dátumot vár: <szelekció YYYYMMDD>_<generálás YYYYMMDD>.
     // Idő (HHMMSS) ide INVALID_FORMAT-ot okoz, ezért itt NEM az egyedi időbélyeget használjuk.
     // A partner-mező a kiválasztott (valódi) mérlegkör felelős EIC – fájlnév-biztos formában.
@@ -771,7 +832,7 @@ export async function generateBundle(
     invDevices = count;
     files.push({
       name: `inverter_master-data_${suffix}.json`,
-      content: buildInverterMasterData(pods, invSpec),
+      content: buildInverterMasterData(pods, invSpec, srcRows),
       mime: 'application/json',
       target: 'swagger',
       hint: 'Inverter gyártói törzsadat – másold a Swagger (receiveMasterDataFromManufacturer) request body-ba',
@@ -799,7 +860,7 @@ export async function generateBundle(
     pods.forEach((p, idx) => {
       files.push({
         name: `inverter_parositas_${idx + 1}_${suffix}.json`,
-        content: buildInverterPairing(p, invSpec, idx, pocs?.[idx]),
+        content: buildInverterPairing(p, invSpec, idx, pocs?.[idx], srcRows?.[idx]),
         mime: 'application/json',
         target: 'rabbit',
         hint: 'Inverter párosítás → RabbitMQ pod-registry.inverter-pod-data (Management UI → Publish → Payload)',
@@ -811,7 +872,7 @@ export async function generateBundle(
     if (count > 1) {
       files.push({
         name: `inverter_parositas_OSSZES_${suffix}.json`,
-        content: buildInverterPairingAll(pods, invSpec, pocs),
+        content: buildInverterPairingAll(pods, invSpec, pocs, srcRows),
         mime: 'application/json',
         target: 'rabbit',
         hint: 'Inverter párosítás – ÖSSZES egy JSON tömbben (egy üzenetként, ha a consumer elfogadja a tömböt)',

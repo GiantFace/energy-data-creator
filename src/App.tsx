@@ -30,7 +30,7 @@ import { getCookie, setCookie } from './lib/cookies';
 import { Icon, type IconName } from './Icons';
 import './App.css';
 
-const APP_VERSION = 'v1.4.0';
+const APP_VERSION = 'v1.4.1';
 
 const DEFAULT_SFTP = 'https://sftp.uat.enap.oci/web/client/files';
 const DEFAULT_SWAGGER =
@@ -507,6 +507,9 @@ export default function App() {
     setUsedFiles(new Set()); // új generálás → tiszta „felhasználva" jelölők
     let pods: string[];
     let pocs: string[] | undefined;     // importált SZINKRON: POD-onkénti FOGYHELY_AZON (a párosítás poc-ja)
+    // importált SZINKRON: a POD-onkénti FORRÁSSOR – ebből megy a cím/ügyfél/tarifa a generált SZINKRON-ba,
+    // a gyártói törzsadatba és a párosításba (a származtatott sorok a forrássorukét öröklik).
+    let srcRows: (Record<string, string> | undefined)[] | undefined;
     let szMerlegkor: string | undefined; // importált SZINKRON: a fájl mérlegkör felelőse
     if (podMode === 'auto') {
       const n = parseInt(count, 10);
@@ -533,6 +536,7 @@ export default function App() {
       // A felszorzott sorok (ha a kért darabszám több a fájlénál) – POD és poc együtt léptetve.
       pods = szKeysGen.map((k) => k.pod);
       pocs = szKeysGen.map((k) => k.poc || ''); // üres → a párosítás a számított poc-ra esik vissza
+      srcRows = szKeysGen.map((k) => k.row);
       szMerlegkor = szKeysGen.find((k) => k.merlegkor)?.merlegkor;
     } else {
       if (!realPods.length) { setError('Illessz be legalább egy valódi POD-ot (soronként egyet).'); return; }
@@ -577,7 +581,7 @@ export default function App() {
     const largeMavir = meres && mavirPoints > MAVIR_POINTS_CAP;
     const canStream = typeof (window as unknown as { showSaveFilePicker?: unknown }).showSaveFilePicker === 'function';
     if (largeMavir && canStream) {
-      await generateStreamed(pods, fromDate, genDateD, spec, msconstSpec, pocs, mkForGen);
+      await generateStreamed(pods, fromDate, genDateD, spec, msconstSpec, pocs, mkForGen, srcRows);
       return;
     }
 
@@ -586,7 +590,7 @@ export default function App() {
     try {
       const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres, inverter, invMeres, invPair, msconst }, spec, mkForGen, msconstSpec, (frac) => {
         if (runRef.current === myRun) setToast({ pct: Math.round(frac * 100), done: false });
-      }, pocs, mavirChannels);
+      }, pocs, mavirChannels, srcRows);
       if (runRef.current !== myRun) return; // időközben új generálás indult
       setFiles(res.files);
       setToast({ pct: 100, done: true });
@@ -598,7 +602,7 @@ export default function App() {
 
   // Nagy MAVIR: a böngésző egy save-dialógusban kéri a helyet, majd ~1 MB-os darabokban a LEMEZRE írja
   // (a memóriában mindig csak egy darab van), így tetszőleges méret sem szállítja el a fület.
-  async function generateStreamed(pods: string[], fromDate: Date, genDateD: Date, spec: InverterSpec, msconstSpec: MsconstSpec, pocs: string[] | undefined, mkStream: string) {
+  async function generateStreamed(pods: string[], fromDate: Date, genDateD: Date, spec: InverterSpec, msconstSpec: MsconstSpec, pocs: string[] | undefined, mkStream: string, srcRows?: (Record<string, string> | undefined)[]) {
     type Writable = { write: (s: string) => Promise<void>; close: () => Promise<void>; abort?: () => Promise<void> };
     const now = new Date();
     const { podsPerFile, parts } = mavirSplitPlan(pods.length, fromDate, now);
@@ -614,7 +618,7 @@ export default function App() {
       const myRun = ++runRef.current;
       setToast({ pct: 0, done: false });
       try {
-        const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres: false, inverter, invMeres, invPair, msconst }, spec, mkStream, msconstSpec, undefined, pocs);
+        const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres: false, inverter, invMeres, invPair, msconst }, spec, mkStream, msconstSpec, undefined, pocs, mavirChannels, srcRows);
         const sums: number[] = new Array(pods.length).fill(0);
         const partInfos: GeneratedFile[] = [];
         for (let pi = 0; pi < parts; pi++) {
@@ -672,7 +676,7 @@ export default function App() {
     setToast({ pct: 0, done: false });
     try {
       // SZINKRON + inverter (gyors, memóriában) – MAVIR nélkül; a MAVIR-t streameljük.
-      const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres: false, inverter, invMeres, invPair, msconst }, spec, mkStream, msconstSpec, undefined, pocs);
+      const res = await generateBundle(pods, fromDate, genDateD, { szinkron, meres: false, inverter, invMeres, invPair, msconst }, spec, mkStream, msconstSpec, undefined, pocs, mavirChannels, srcRows);
       const sums: number[] = new Array(pods.length).fill(0);
       for await (const chunk of mavirXmlChunks(pods, fromDate, now, now, (frac) => {
         if (runRef.current === myRun) setToast({ pct: Math.round(frac * 100), done: false });
@@ -944,15 +948,17 @@ export default function App() {
                         <b>{szKeysGen.length}</b> POD készül a(z) <b>{selectedSz.name}</b> profilból
                         {selectedSz.selectedPods?.length ? <> ({szKeys.length}-ből {szKeysSel.length} kijelölve)</> : <> ({szKeysSel.length} sor)</>}
                         {szKeysGen.length > szKeysSel.length && (
-                          <> — ebből <b>{szKeysSel.length}</b> a fájlból, <b>{szKeysGen.length - szKeysSel.length}</b> abból
-                            <b> származtatva</b>: a POD és a <code>[FOGYHELY_AZON]</code> végén lévő sorszámot léptetjük
-                            (a POD így is pontosan 33 karakter marad), a mérlegkör/elosztó a forrássorból öröklődik.
+                          <> — ebből <b>{szKeysSel.length}</b> a fájlból (változatlanul), <b>{szKeysGen.length - szKeysSel.length}</b> abból
+                            <b> származtatva</b>: a sorszám a <b>POD VÉGÉRE</b> kerül (…{String(szKeysGen.length).replace(/./g, '0').slice(1)}1,
+                            …{String(szKeysGen.length)}), a hossz marad 33 karakter, a <code>[FOGYHELY_AZON]</code> pedig
+                            a forrássoré léptetve. A <b>cím, az ügyfél és a tarifa-mezők a mintából</b> (a forrássorból)
+                            öröklődnek – a generált SZINKRON-ba, a gyártói törzsadatba és a párosítás címébe is.
                             A SZINKRON CSV mind a(z) {szKeysGen.length} sort tartalmazza – <b>ez hozza létre</b> az új
                             POD-okat –, és a <b>MAVIR mérés</b>, az <b>inverter törzsadat/mérésadat</b> és a
                             <b> párosítás</b> is mind a(z) {szKeysGen.length} POD-ra készül</>
                         )}
                         {szKeysGen.length < szKeysSel.length && <> — a fájl {szKeysSel.length} sorából az <b>első {szKeysGen.length}</b></>}
-                        {'. '}A párosítás <b>poc</b>-ja a fájl <code>[FOGYHELY_AZON]</code>-ja, a mérlegkör is a fájlból jön.
+                        {'. '}A párosítás <b>poc</b>-ja a fájl <code>[FOGYHELY_AZON]</code>-ja, a mérlegkör és a cím is a fájlból jön.
                         A kijelölést a <b>„Feltöltött SZINKRON"</b> lapon, a szerkesztőben állíthatod.
                         {szShort && <> ⚠ Csak <b>{szKeysGen.length}</b> POD-ot tudtunk előállítani a kért {szWant} helyett:
                           a forrás-POD-ok sorszáma túlcsordulna (a POD nem lehet 33 karakternél hosszabb).</>}
