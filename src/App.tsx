@@ -30,7 +30,7 @@ import { getCookie, setCookie } from './lib/cookies';
 import { Icon, type IconName } from './Icons';
 import './App.css';
 
-const APP_VERSION = 'v1.4.2';
+const APP_VERSION = 'v1.4.3';
 
 const DEFAULT_SFTP = 'https://sftp.uat.enap.oci/web/client/files';
 const DEFAULT_SWAGGER =
@@ -232,6 +232,13 @@ const MAVIR_POINTS_CAP = 2_000_000;
 // Ennyi POD-onkénti fájl (párosítás / inverter mérésadat) fölött külön engedély kell – a fájllista
 // és a böngésző memóriája is megfekszik tőle.
 const PER_POD_FILES_CAP = 2_000;
+// A feltöltött SZINKRON felszorzásának FELSŐ HATÁRA. Ez RENDERELÉS közben fut le (a mezőbe gépelt
+// szám azonnal ennyi sort épít), ezért itt kemény korlát kell: egy elgépelt „1000000000" különben
+// azonnal megfagyasztaná a fület, még mielőtt a generálás-ellenőrzések lefutnának.
+const SZ_EXPAND_CAP = 20_000;
+// A generálandó POD-ok abszolút felső határa (engedéllyel átléphető) – e fölött a CSV/fájlépítés
+// már a böngésző memóriáját feszegeti.
+const POD_COUNT_CAP = 50_000;
 const FIFTEEN_MIN_MS = 15 * 60_000;
 
 function loadStoredFiles(): GeneratedFile[] | null {
@@ -438,12 +445,13 @@ export default function App() {
   // EBBŐL megy a POD-készlet minden kimenetbe (SZINKRON CSV, MAVIR, inverter törzsadat/mérés, párosítás),
   // így a bővítést mindegyik automatikusan követi.
   const szWant = Math.max(0, parseInt(szCount, 10) || 0);
+  const szCapped = Math.min(szWant, SZ_EXPAND_CAP); // renderelés közben fut → kemény korlát
   const szKeysGen = useMemo(
-    () => (szWant > 0 ? expandSzinkronRows(szKeysSel, szWant) : szKeysSel),
-    [szKeysSel, szWant],
+    () => (szCapped > 0 ? expandSzinkronRows(szKeysSel, szCapped) : szKeysSel),
+    [szKeysSel, szCapped],
   );
   // Kevesebb jött ki a kértnél → volt olyan POD, aminek a sorszáma túlcsordult volna (nem maradhat 33 karakter).
-  const szShort = szWant > 0 && szKeysGen.length < szWant;
+  const szShort = szCapped > 0 && szKeysGen.length < szCapped;
   // Vegyes-e a fájl (több DSO vagy több mérlegkör) – figyelmeztetéshez (de mind betöltjük).
   const szMixed = useMemo(() => {
     const dsoSet = new Set(szKeys.map((k) => k.pod.slice(0, 8)));
@@ -562,6 +570,14 @@ export default function App() {
     const mkForGen = (podMode === 'szinkron' && szMerlegkor) ? szMerlegkor : merlegkor;
     if (!from) { setError('Válassz érvényes mérés-kezdő dátumot.'); return; }
     if (!szinkron && !meres && !inverter && !invMeres && !invPair && !msconst) { setError('Pipálj ki legalább egy kimenetet.'); return; }
+    if (pods.length > POD_COUNT_CAP && !allowLarge) {
+      setError(
+        `Túl sok POD: ${pods.length.toLocaleString('hu-HU')} db. Ennyi POD-ból a fájlok felépítése ` +
+          `kifogyaszthatja a böngésző memóriáját. Pipáld be a „Nagy generálás engedélyezése" négyzetet, ` +
+          `vagy csökkentsd a POD-ok számát.`,
+      );
+      return;
+    }
     if (perPodFiles > PER_POD_FILES_CAP && !allowLarge) {
       setError(
         `Túl sok fájl készülne: ~${perPodFiles.toLocaleString('hu-HU')} db (POD-onként egy párosítás` +
@@ -972,6 +988,7 @@ export default function App() {
                         <input
                           type="number"
                           min={1}
+                          max={SZ_EXPAND_CAP}
                           value={szCount}
                           placeholder={`${szKeysSel.length} (a fájl sorai)`}
                           onChange={(e) => setSzCount(e.target.value)}
@@ -995,7 +1012,9 @@ export default function App() {
                         {szKeysGen.length < szKeysSel.length && <> — a fájl {szKeysSel.length} sorából az <b>első {szKeysGen.length}</b></>}
                         {'. '}A párosítás <b>poc</b>-ja a fájl <code>[FOGYHELY_AZON]</code>-ja, a mérlegkör és a cím is a fájlból jön.
                         A kijelölést a <b>„Feltöltött SZINKRON"</b> lapon, a szerkesztőben állíthatod.
-                        {szShort && <> ⚠ Csak <b>{szKeysGen.length}</b> POD-ot tudtunk előállítani a kért {szWant} helyett:
+                        {szWant > SZ_EXPAND_CAP && <> ⚠ A bővítés felső határa <b>{SZ_EXPAND_CAP.toLocaleString('hu-HU')}</b> POD
+                          (a kért {szWant.toLocaleString('hu-HU')} helyett ennyi készül) – ennél többet a böngésző már nem bír el.</>}
+                        {szShort && <> ⚠ Csak <b>{szKeysGen.length}</b> POD-ot tudtunk előállítani a kért {szCapped} helyett:
                           a forrás-POD-ok sorszáma túlcsordulna (a POD nem lehet 33 karakternél hosszabb).</>}
                         {szMixed && <> ⚠ A fájl <b>többféle DSO-t/mérlegkört</b> tartalmaz – mind betöltjük.</>}
                       </p>
@@ -1020,6 +1039,10 @@ export default function App() {
                     </label>
                     <p className="hint">
                       <b>{realPods.length}</b> POD felismerve. A mérés vége mindig a mostani idő (automatikus).
+                      {invPair && <> ⚠ A párosítás <b>poc</b>-ja itt a <b>számított</b> érték (199700001…), mert a
+                        beillesztett POD-hoz nem tartozik <code>[FOGYHELY_AZON]</code>. Ha a registry-ben más a
+                        fogyasztási hely azonosítója, a párosítás nem társítja a mérési helyet – ilyenkor használd a
+                        <b> „Feltöltött SZINKRON"</b> módot, ott a fájl valódi FOGYHELY_AZON-ja megy a párosításba.</>}
                     </p>
                     {badPods.length > 0 && (
                       <p className="hint warn">

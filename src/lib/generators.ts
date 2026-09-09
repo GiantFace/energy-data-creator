@@ -480,8 +480,9 @@ export function buildMsconst(pods: string[], spec: MsconstSpec, generated: Date)
     '<EDW_XML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://tempuri.org/MAVIR">\r\n' +
     '    <HEADER>\r\n        <VERSION>1.0</VERSION>\r\n        <GENERATOR>WM_XML_Generator</GENERATOR>\r\n' +
     `        <GENERATED-DATETIME>${isoLocal(generated)}</GENERATED-DATETIME>\r\n    </HEADER>\r\n`;
+  // Fordított sorrendű megadást (min > max) is elfogadunk – a tartomány a két érték között van.
   const lo = Math.min(spec.valueMin, spec.valueMax);
-  const span = Math.max(0, spec.valueMax - spec.valueMin);
+  const span = Math.abs(spec.valueMax - spec.valueMin);
   let buf = head;
   for (const p of pods) {
     const v = (lo + Math.random() * span).toFixed(3);
