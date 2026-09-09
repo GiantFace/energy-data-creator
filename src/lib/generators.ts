@@ -146,15 +146,31 @@ export function dsoNoFromPod(pod: string): string {
   return /^[0-9]{6}$/.test(digits) ? `EHE${digits}` : 'EHE000000';
 }
 
-// A POD-törzs tisztítása: nagybetűs [A-Z0-9-] (a doc-mintában kötőjel is van), max 25 karakter.
+// A POD PONTOS hossza – ennél se több, se kevesebb nem megy át a master-data validátorán.
+export const POD_LEN = 33;
+// A törzs maximuma: 33 - 8 (HU + 6 jegyű DSO) - 1, mert a sorszámnak legalább egy jegy kell.
+export const POD_BODY_MAX = POD_LEN - 8 - 1; // 24
+
+// A POD-törzs tisztítása: nagybetűs [A-Z0-9-] (a doc-mintában kötőjel is van), a maradék helyre vágva.
 export function sanitizePodBody(raw: string): string {
-  return (raw ?? '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 25);
+  return (raw ?? '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, POD_BODY_MAX);
 }
 
 // A DSO-kódból az előtag: HU + 6 jegyű DSO-azonosító (pl. EHE000910 -> HU000910). Mindig 8 karakter.
 function podPrefix(dso: string): string {
   const raw = dso.toUpperCase().startsWith('EHE') ? dso.slice(3) : dso.replace(/\D/g, '');
   return 'HU' + raw.slice(0, 6).padEnd(6, '0');
+}
+
+// Mennyi POD fér el egy adott törzzsel? A POD FIX 33 karakter, így a sorszámnak csak az marad,
+// amit az előtag (8) és a törzs meghagy: `seqWidth` jegy → 1..10^seqWidth-1 sorszám.
+// Ennél többet kérve a sorszám kilógna (34 karakteres POD → „Invalid POD format”), ezért a
+// hívó ELŐRE ellenőrzi ezzel, és nem a generálás közben derül ki, hogy nem fér el.
+//   pl. 24 karakteres törzs → 1 jegy → max 9 POD;  19 karakteres törzs → 6 jegy → max 999 999 POD.
+export function podCapacity(dso: string, body: string): { body: string; seqWidth: number; max: number } {
+  const b = sanitizePodBody(body);
+  const seqWidth = POD_LEN - podPrefix(dso).length - b.length;
+  return { body: b, seqWidth, max: 10 ** seqWidth - 1 };
 }
 
 // Sorszámozott POD a master-data elvárt formátumában: HU + 6 jegyű DSO-kód + törzs + sorszám,
@@ -164,9 +180,11 @@ function podPrefix(dso: string): string {
 export function generatePods(count: number, dso: string, body: string): string[] {
   const n = Math.max(0, Math.floor(count) || 0);
   const prefix = podPrefix(dso); // 8 karakter
-  // A törzset úgy korlátozzuk, hogy a sorszámnak legalább 1 hely maradjon a 33 karakteren belül.
-  const b = sanitizePodBody(body).slice(0, Math.max(0, 33 - prefix.length - 1));
-  const seqWidth = 33 - prefix.length - b.length; // a sorszám kitölti a maradékot → összesen 33
+  const { body: b, seqWidth, max } = podCapacity(dso, body);
+  // Backstop: ennyi sorszám nem fér a 33 karakterbe. A felület ezt előre jelzi, ide már nem juthat el.
+  if (n > max) {
+    throw new RangeError(`A(z) "${b}" törzs mellett csak ${max} POD fér el (${seqWidth} jegyű sorszám).`);
+  }
   const out: string[] = [];
   for (let i = 1; i <= n; i++) {
     out.push(prefix + b + String(i).padStart(seqWidth, '0'));
@@ -174,9 +192,15 @@ export function generatePods(count: number, dso: string, body: string): string[]
   return out;
 }
 
+// Egyetlen sorszámozott POD (a készlet i-edik eleme) – a felület mintáihoz, tömb építése nélkül.
+export function podAt(dso: string, body: string, index: number): string {
+  const { body: b, seqWidth } = podCapacity(dso, body);
+  return podPrefix(dso) + b + String(Math.max(1, Math.floor(index) || 1)).padStart(seqWidth, '0');
+}
+
 // Stabil minta a felülethez (az 1. POD), hogy a felhasználó élőben lássa a végeredményt.
 export function examplePodTemplate(dso: string, body: string): string {
-  return generatePods(1, dso, body)[0] ?? '';
+  return podAt(dso, body, 1);
 }
 
 // A FOGYHELY_AZON (fogyasztási hely / POC azonosító): a SZINKRON ezt írja, és ez lesz a POD PocNo-ja
@@ -186,8 +210,10 @@ const fogyhelyAzon = (i: number) => String(FOGYHELY_BASE + i);
 
 // A POD-ot kívülről kapja (a közös, beillesztett `pods` készletből) – így a SZINKRON, a MAVIR
 // és az inverter MINDIG bájtra azonos POD-okat használ. Az [Eloszto] a POD-ból levezetett DSO.
-function szinkronRow(p: string, i: number, merlegkor: string): string {
-  const fogyhely = fogyhelyAzon(i);
+// A `poc` (ha van) a feltöltött SZINKRON FOGYHELY_AZON-ja vagy annak léptetett párja – így a CSV,
+// a párosítás és a registry UGYANAZT a fogyasztási helyet kapja. Nélküle a számított érték megy.
+function szinkronRow(p: string, i: number, merlegkor: string, poc?: string): string {
+  const fogyhely = poc || fogyhelyAzon(i);
   return [
     '2024.09.01', '2040.12.31', dsoNoFromPod(p), TRADER, merlegkor, p, fogyhely,
     '0.0', 'IDOS', '2026.05.01', '10.01', '10.01', 'Teszt', `Ugyfel${i}`, 'Teszt utca', String(i),
@@ -221,6 +247,71 @@ export function parseSzinkron(text: string): SzinkronParsed {
     rows.push(row);
   }
   return { columns, rows };
+}
+
+// Egy sorozat-azonosító (POD vagy FOGYHELY_AZON) léptetése a HOSSZ MEGTARTÁSÁVAL – a POD ugyanis fix
+// 33 karakter, egy jegynyi növekedés is „Invalid POD format”-ot adna. A valódi POD-ok nem mindig
+// számmal végződnek (pl. …000000000000HARVEYS), ezért a LEGHOSSZABB számjegy-blokkot léptetjük
+// (egyenlőségnél a jobb szélsőt) – ez adja a legtöbb szabad sorszámot is.
+// `protect` karaktert érintetlenül hagyunk az elején: POD-nál 8-at, mert a HU + 6 jegyű DSO-kódból
+// vezetjük le az [Eloszto]-t és a fájlneveket – azt léptetni más elosztóhoz tenné a POD-ot.
+// null, ha nincs benne szám, vagy ha túlcsordulna (csupa 9) – ilyenkor abból a sorból nem bővítünk.
+function bumpSerial(id: string, by: number, protect = 0): string | null {
+  const head = (id ?? '').slice(0, protect);
+  const rest = (id ?? '').slice(protect);
+  let best: { at: number; digits: string } | null = null;
+  for (const m of rest.matchAll(/\d+/g)) {
+    if (!best || m[0].length >= best.digits.length) best = { at: m.index, digits: m[0] };
+  }
+  if (!best) return null;
+  const next = (BigInt(best.digits) + BigInt(by)).toString();
+  if (next.length > best.digits.length) return null; // hosszabb lenne az azonosító → nem használható
+  return head + rest.slice(0, best.at) + next.padStart(best.digits.length, '0') + rest.slice(best.at + best.digits.length);
+}
+
+// Ugyanaz, de átugorja a már foglalt értékeket (a feltöltött fájlban lévőket és a korábban gyártottakat).
+function bumpUnique(id: string, by: number, used: Set<string>, protect = 0): string | null {
+  for (let k = by; k < by + 10_000; k++) {
+    const v = bumpSerial(id, k, protect);
+    if (!v) return null;
+    if (!used.has(v)) return v;
+  }
+  return null;
+}
+
+// A feltöltött SZINKRON sorainak FELSZORZÁSA `total` darabra: a meglévő sorokból származtat újakat úgy,
+// hogy a POD és a FOGYHELY_AZON végén lévő sorszámot lépteti (a mérlegkör/elosztó a forrássorból öröklődik).
+// Így egy 3 soros fájlból kérhető 100 POD: a SZINKRON CSV mind a 100 sort megkapja (ez hozza létre őket a
+// registry-ben), és MIVEL a MAVIR, az inverter törzsadat/mérés és a párosítás UGYANEBBŐL a POD-készletből
+// dolgozik, mindegyik kimenet automatikusan mind a 100 POD-ra készül.
+// `total` <= a sorok száma esetén csak az első `total` sort adja vissza (szűkítés).
+// Ha egy POD nem léptethető tovább (túlcsordulna), azt kihagyja – ezért a visszaadott tömb RÖVIDEBB is lehet
+// a kértnél; a hívó a hossz alapján tud figyelmeztetni.
+export function expandSzinkronRows(base: SzinkronRowKey[], total: number): SzinkronRowKey[] {
+  const want = Math.max(0, Math.floor(total) || 0);
+  if (!base.length || !want) return [];
+  if (want <= base.length) return base.slice(0, want);
+  const out = base.slice();
+  const usedPods = new Set(base.map((r) => r.pod));
+  const usedPocs = new Set(base.map((r) => r.poc).filter(Boolean));
+  // Körökben megyünk végig a forrássorokon (1., 2., … léptetés), hogy a származtatott POD-ok
+  // egyenletesen oszoljanak el a fájl összes sora között (több DSO/mérlegkör esetén is).
+  for (let round = 1; out.length < want; round++) {
+    let added = 0;
+    for (let i = 0; i < base.length && out.length < want; i++) {
+      const src = base[i];
+      // A POD első 8 karaktere (HU + DSO-kód) VÉDETT – abból jön az [Eloszto] és a fájlnevek.
+      const pod = bumpUnique(src.pod, round, usedPods, 8);
+      if (!pod) continue;
+      const poc = src.poc ? (bumpUnique(src.poc, round, usedPocs) ?? '') : '';
+      usedPods.add(pod);
+      if (poc) usedPocs.add(poc);
+      out.push({ ...src, pod, poc });
+      added++;
+    }
+    if (!added) break; // egyetlen sor sem léptethető tovább → ennyi fér el
+  }
+  return out;
 }
 
 // A parsolt SZINKRON sorokból a generáláshoz fontos mezők (POD, FOGYHELY_AZON=poc, mérlegkör, eloszto).
@@ -627,7 +718,7 @@ export async function generateBundle(
   const mkf = merlegkor || BALANCE_EIC;
 
   if (szinkron) {
-    const lines = [HEADER, ...pods.map((p, k) => szinkronRow(p, k + 1, mkf))];
+    const lines = [HEADER, ...pods.map((p, k) => szinkronRow(p, k + 1, mkf, pocs?.[k]))];
     // A parser a fájlnév VÉGÉN két 8-jegyű dátumot vár: <szelekció YYYYMMDD>_<generálás YYYYMMDD>.
     // Idő (HHMMSS) ide INVALID_FORMAT-ot okoz, ezért itt NEM az egyedi időbélyeget használjuk.
     // A partner-mező a kiválasztott (valódi) mérlegkör felelős EIC – fájlnév-biztos formában.

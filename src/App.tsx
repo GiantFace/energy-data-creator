@@ -8,6 +8,10 @@ import {
   generateBundle,
   generatePods,
   examplePodTemplate,
+  podAt,
+  podCapacity,
+  sanitizePodBody,
+  POD_BODY_MAX,
   mavirXmlChunks,
   mavirSplitPlan,
   mavirFileNames,
@@ -15,6 +19,7 @@ import {
   reportFileName,
   parseSzinkron,
   szinkronKeyRows,
+  expandSzinkronRows,
   type GeneratedFile,
   type InverterSpec,
   type MsconstSpec,
@@ -25,7 +30,7 @@ import { getCookie, setCookie } from './lib/cookies';
 import { Icon, type IconName } from './Icons';
 import './App.css';
 
-const APP_VERSION = 'v1.3.1';
+const APP_VERSION = 'v1.4.0';
 
 const DEFAULT_SFTP = 'https://sftp.uat.enap.oci/web/client/files';
 const DEFAULT_SWAGGER =
@@ -315,10 +320,16 @@ export default function App() {
   const [selectedSzId, setSelectedSzId] = useLocalStorage('selectedSzId', ''); // a generáláshoz kiválasztott
   const [editSzId, setEditSzId] = useState<string>(''); // a SZINKRON-lapon épp szerkesztett
   const [count, setCount] = useLocalStorage('count', '5');
+  // Feltöltött SZINKRON: hány POD készüljön? Üres → a fájl (kijelölt) sorai. Nagyobb szám → a
+  // meglévő sorokból származtatunk továbbiakat (POD/FOGYHELY_AZON sorszám léptetve).
+  const [szCount, setSzCount] = useLocalStorage('szCount', '');
   const [dso, setDso] = useLocalStorage('dso', 'EHE000210');
   const [merlegkor, setMerlegkor] = useLocalStorage('merlegkor', '15X-SINERGY----D');
   // A POD-törzs SZÁNDÉKOSAN nem perzisztens: minden oldalbetöltéskor új véletlen érték.
   const [podBody, setPodBody] = useState(randomPodBody);
+  // Amíg igaz, minden generálás új véletlen törzset kap (ütközésmentes). Ha a felhasználó KÉZZEL
+  // ír a mezőbe, kikapcsol – onnantól PONTOSAN azt a törzset generáljuk, amit beírt.
+  const [podBodyAuto, setPodBodyAuto] = useState(true);
   const [podsText, setPodsText] = useState(() => {
     try { return localStorage.getItem(PODS_KEY) ?? ''; } catch { return ''; }
   });
@@ -418,6 +429,16 @@ export default function App() {
     const sel = selectedSz?.selectedPods;
     return sel && sel.length ? szKeys.filter((k) => sel.includes(k.pod)) : szKeys;
   }, [szKeys, selectedSz]);
+  // A ténylegesen generálandó sorok: a kijelöltek felszorozva a kért darabszámra (ha az több).
+  // EBBŐL megy a POD-készlet minden kimenetbe (SZINKRON CSV, MAVIR, inverter törzsadat/mérés, párosítás),
+  // így a bővítést mindegyik automatikusan követi.
+  const szWant = Math.max(0, parseInt(szCount, 10) || 0);
+  const szKeysGen = useMemo(
+    () => (szWant > 0 ? expandSzinkronRows(szKeysSel, szWant) : szKeysSel),
+    [szKeysSel, szWant],
+  );
+  // Kevesebb jött ki a kértnél → volt olyan POD, aminek a sorszáma túlcsordult volna (nem maradhat 33 karakter).
+  const szShort = szWant > 0 && szKeysGen.length < szWant;
   // Vegyes-e a fájl (több DSO vagy több mérlegkör) – figyelmeztetéshez (de mind betöltjük).
   const szMixed = useMemo(() => {
     const dsoSet = new Set(szKeys.map((k) => k.pod.slice(0, 8)));
@@ -427,7 +448,15 @@ export default function App() {
 
   // A generálandó POD-ok száma (a választott mód szerint) és a becsült MAVIR adatpontok száma.
   const podCount = podMode === 'auto' ? Math.max(0, parseInt(count, 10) || 0)
-    : podMode === 'szinkron' ? szKeysSel.length : realPods.length;
+    : podMode === 'szinkron' ? szKeysGen.length : realPods.length;
+  // Hány POD fér el a BEÍRT törzzsel? A POD fix 33 karakter, így a törzs hossza szabja meg,
+  // hány jegy marad a sorszámnak (24 karakteres törzs → 1 jegy → max 9 POD).
+  const podCap = useMemo(() => podCapacity(dso, podBody), [dso, podBody]);
+  const podOverflow = podMode === 'auto' && !podBodyAuto && podCount > podCap.max;
+  // Rövid törzsnél a kapacitás csillagászati (10^19…10^25) – ott nincs értelme kiírni a pontos számot.
+  const podMaxLabel = podCap.max > 1e9 ? 'gyakorlatilag korlátlan számú' : podCap.max.toLocaleString('hu-HU');
+  // A mintában mutatott UTOLSÓ POD sorszáma – a kapacitásra vágva, hogy ne mutassunk nem létező POD-ot.
+  const podLastNo = Math.min(podCount, podCap.max);
   const mavirPoints = useMemo(() => {
     if (!meres || !from) return 0;
     const fromMs = new Date(from + 'T00:00:00').getTime();
@@ -482,16 +511,29 @@ export default function App() {
     if (podMode === 'auto') {
       const n = parseInt(count, 10);
       if (!Number.isFinite(n) || n < 1) { setError('Adj meg egy pozitív POD-darabszámot.'); return; }
-      // Minden generáláskor FRISS véletlen POD-törzs – így sosem ugyanaz a POD-készlet.
-      const body = randomPodBody();
+      // Kézzel beírt törzs → PONTOSAN azt használjuk (a SZINKRON is ezekkel a POD-okkal készül).
+      // Csak akkor sorsolunk frisset, ha a véletlen törzs be van kapcsolva (ütközésmentes készlet).
+      const body = podBodyAuto ? randomPodBody() : sanitizePodBody(podBody);
+      // A POD fix 33 karakter: a törzs után maradó jegyek szabják meg, hány POD fér el.
+      const cap = podCapacity(dso, body);
+      if (n > cap.max) {
+        setError(
+          `Ezzel a törzzsel (${cap.body || '—'}, ${cap.body.length} karakter) legfeljebb ` +
+            `${cap.max.toLocaleString('hu-HU')} POD generálható: a 33 karakterből csak ${cap.seqWidth} jegy ` +
+            `marad a sorszámnak. Kérj kevesebb POD-ot, vagy rövidítsd a törzset ` +
+            `(minden elhagyott karakter tízszerezi a lehetséges POD-ok számát).`,
+        );
+        return;
+      }
       setPodBody(body);
       pods = generatePods(n, dso, body);
     } else if (podMode === 'szinkron') {
       if (!selectedSz) { setError('Válassz egy feltöltött SZINKRON profilt (a „Feltöltött SZINKRON” lapon tölthetsz fel és menthetsz).'); return; }
-      if (!szKeysSel.length) { setError('A kiválasztott SZINKRON nem tartalmaz (kijelölt) POD-ot.'); return; }
-      pods = szKeysSel.map((k) => k.pod);
-      pocs = szKeysSel.map((k) => k.poc || ''); // üres → a párosítás a számított poc-ra esik vissza
-      szMerlegkor = szKeysSel.find((k) => k.merlegkor)?.merlegkor;
+      if (!szKeysGen.length) { setError('A kiválasztott SZINKRON nem tartalmaz (kijelölt) POD-ot.'); return; }
+      // A felszorzott sorok (ha a kért darabszám több a fájlénál) – POD és poc együtt léptetve.
+      pods = szKeysGen.map((k) => k.pod);
+      pocs = szKeysGen.map((k) => k.poc || ''); // üres → a párosítás a számított poc-ra esik vissza
+      szMerlegkor = szKeysGen.find((k) => k.merlegkor)?.merlegkor;
     } else {
       if (!realPods.length) { setError('Illessz be legalább egy valódi POD-ot (soronként egyet).'); return; }
       pods = realPods;
@@ -809,7 +851,13 @@ export default function App() {
                     <div className="grid3">
                       <label>
                         <span>POD-ok száma</span>
-                        <input type="number" min={1} value={count} onChange={(e) => setCount(e.target.value)} />
+                        <input
+                          type="number"
+                          min={1}
+                          max={podBodyAuto ? undefined : podCap.max}
+                          value={count}
+                          onChange={(e) => setCount(e.target.value)}
+                        />
                       </label>
                       <label>
                         <span>DSO (Eloszto)</span>
@@ -820,30 +868,52 @@ export default function App() {
                         </select>
                       </label>
                       <label>
-                        <span>POD törzs (véletlen)</span>
+                        <span>POD törzs ({podCap.body.length}/{POD_BODY_MAX} karakter)</span>
                         <span className="input-row">
+                          {/* Élőben tisztítjuk (nagybetű, [A-Z0-9-], 24 karakter), hogy PONTOSAN az látszódjon,
+                              amiből a POD készül – ne csendben csonkuljon a generáláskor. A kézi írás
+                              kikapcsolja a véletlen törzset: onnantól a beírt törzzsel generálunk. */}
                           <input
                             type="text"
                             value={podBody}
+                            maxLength={POD_BODY_MAX}
                             placeholder="pl. KSP19D"
-                            onChange={(e) => setPodBody(e.target.value)}
+                            onChange={(e) => { setPodBody(sanitizePodBody(e.target.value)); setPodBodyAuto(false); }}
                           />
                           <button
                             type="button"
                             className="mini-btn"
                             title="Új véletlen törzs"
-                            onClick={() => setPodBody(randomPodBody())}
+                            onClick={() => { setPodBody(randomPodBody()); setPodBodyAuto(true); }}
                           >
                             <Icon name="shuffle" size={14} />
                           </button>
                         </span>
                       </label>
                     </div>
-                    <p className="hint">
-                      Minta POD (1.): <code>{examplePodTemplate(dso, podBody)}</code> — a törzs után a sorszám
-                      nullával <b>33 karakterre</b> töltve. A törzs <b>minden generáláskor</b> (és oldalbetöltéskor)
-                      új véletlen érték. a 🔀 gombbal előre is pörgethetsz egyet —, így sosem generálsz kétszer
-                      ugyanolyan POD-ot.
+                    <label className="check" style={{ marginTop: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={podBodyAuto}
+                        onChange={(e) => setPodBodyAuto(e.target.checked)}
+                      />
+                      <span>Minden generáláskor új véletlen törzs (kikapcsolva a beírt törzzsel generál)</span>
+                    </label>
+                    <p className={`hint${podOverflow ? ' warn' : ''}`}>
+                      Minta POD (1.): <code>{examplePodTemplate(dso, podBody)}</code>
+                      {podLastNo > 1 && <> … ({podLastNo}.): <code>{podAt(dso, podBody, podLastNo)}</code></>}
+                      {' '}— a POD <b>pontosan 33 karakter</b>: a 8 karakteres <code>HU+DSO</code> és a{' '}
+                      <b>{podCap.body.length}</b> karakteres törzs után <b>{podCap.seqWidth}</b> jegy marad a sorszámnak,
+                      vagyis ezzel a törzzsel legfeljebb <b>{podMaxLabel}</b> POD generálható.
+                      {podOverflow
+                        ? <> ⚠ <b>{podCount} POD-ot</b> kértél – ennyi nem fér el. Kérj kevesebbet, vagy rövidítsd a
+                            törzset: minden elhagyott karakter <b>tízszerezi</b> a lehetséges POD-ok számát.</>
+                        : null}
+                      {podBodyAuto
+                        ? <> A törzs <b>minden generáláskor</b> (és oldalbetöltéskor) új véletlen érték – így sosem
+                            generálsz kétszer ugyanolyan POD-ot; a 🔀 gombbal előre is pörgethetsz egyet.</>
+                        : <> A generálás <b>pontosan ezzel a törzzsel</b> megy (a SZINKRON, a MAVIR és az inverter is
+                            ezekkel a POD-okkal készül). Véletlen törzsért pipáld be a fenti négyzetet vagy nyomd meg a 🔀-t.</>}
                     </p>
                   </>
                 ) : podMode === 'szinkron' ? (
@@ -857,12 +927,35 @@ export default function App() {
                         ))}
                       </select>
                     </label>
+                    {selectedSz && (
+                      <label style={{ marginTop: 10, maxWidth: 260 }}>
+                        <span>POD-ok száma (bővítés)</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={szCount}
+                          placeholder={`${szKeysSel.length} (a fájl sorai)`}
+                          onChange={(e) => setSzCount(e.target.value)}
+                        />
+                      </label>
+                    )}
                     {selectedSz ? (
-                      <p className="hint">
-                        <b>{szKeysSel.length}</b> POD a(z) <b>{selectedSz.name}</b> profilból
-                        {selectedSz.selectedPods?.length ? <> ({szKeys.length}-ből kijelölve)</> : <> (mind)</>}. A párosítás
-                        <b> poc</b>-ja a fájl <code>[FOGYHELY_AZON]</code>-ja, a mérlegkör is a fájlból jön. A kijelölést a
-                        <b> „Feltöltött SZINKRON"</b> lapon, a szerkesztőben állíthatod.
+                      <p className={`hint${szShort ? ' warn' : ''}`}>
+                        <b>{szKeysGen.length}</b> POD készül a(z) <b>{selectedSz.name}</b> profilból
+                        {selectedSz.selectedPods?.length ? <> ({szKeys.length}-ből {szKeysSel.length} kijelölve)</> : <> ({szKeysSel.length} sor)</>}
+                        {szKeysGen.length > szKeysSel.length && (
+                          <> — ebből <b>{szKeysSel.length}</b> a fájlból, <b>{szKeysGen.length - szKeysSel.length}</b> abból
+                            <b> származtatva</b>: a POD és a <code>[FOGYHELY_AZON]</code> végén lévő sorszámot léptetjük
+                            (a POD így is pontosan 33 karakter marad), a mérlegkör/elosztó a forrássorból öröklődik.
+                            A SZINKRON CSV mind a(z) {szKeysGen.length} sort tartalmazza – <b>ez hozza létre</b> az új
+                            POD-okat –, és a <b>MAVIR mérés</b>, az <b>inverter törzsadat/mérésadat</b> és a
+                            <b> párosítás</b> is mind a(z) {szKeysGen.length} POD-ra készül</>
+                        )}
+                        {szKeysGen.length < szKeysSel.length && <> — a fájl {szKeysSel.length} sorából az <b>első {szKeysGen.length}</b></>}
+                        {'. '}A párosítás <b>poc</b>-ja a fájl <code>[FOGYHELY_AZON]</code>-ja, a mérlegkör is a fájlból jön.
+                        A kijelölést a <b>„Feltöltött SZINKRON"</b> lapon, a szerkesztőben állíthatod.
+                        {szShort && <> ⚠ Csak <b>{szKeysGen.length}</b> POD-ot tudtunk előállítani a kért {szWant} helyett:
+                          a forrás-POD-ok sorszáma túlcsordulna (a POD nem lehet 33 karakternél hosszabb).</>}
                         {szMixed && <> ⚠ A fájl <b>többféle DSO-t/mérlegkört</b> tartalmaz – mind betöltjük.</>}
                       </p>
                     ) : (
